@@ -22,6 +22,7 @@ export default function QueryScreen() {
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dsl, setDsl] = useState<QueryDsl | null>(null);
+  const [askedQuestion, setAskedQuestion] = useState('');
   const [rows, setRows] = useState<QueryEquipmentRow[]>([]);
   const [groups, setGroups] = useState<QueryGroup[] | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
@@ -50,14 +51,25 @@ export default function QueryScreen() {
   }
 
   async function handleAsk() {
-    if (!question.trim()) return;
+    const questionText = question.trim();
+    if (!questionText) return;
     setLoading(true);
     setError(null);
     setProgress(null);
+    // Clear the previous question's everything the instant a new one is submitted —
+    // otherwise the old answer/chips/table stay fully visible under the loading
+    // indicator for the several seconds the model takes, and it reads as if the new
+    // question already got answered with stale data.
+    setDsl(null);
+    setAskedQuestion('');
+    setRows([]);
+    setGroups(null);
+    setSummary(null);
     try {
-      const parsedDsl = await parseNaturalLanguageQuery(question.trim(), (p) => setProgress(p));
+      const parsedDsl = await parseNaturalLanguageQuery(questionText, (p) => setProgress(p));
       setDsl(parsedDsl);
-      await runQuery(parsedDsl, question.trim());
+      setAskedQuestion(questionText);
+      await runQuery(parsedDsl, questionText);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo interpretar la pregunta.');
     } finally {
@@ -70,7 +82,10 @@ export default function QueryScreen() {
     if (!dsl) return;
     const next: QueryDsl = { ...dsl, [key]: Array.isArray(dsl[key]) ? [] : undefined };
     setDsl(next);
-    runQuery(next, question.trim());
+    // Refining a chip re-runs against the question that produced this result, not
+    // whatever is currently typed in the input box — the user may have already started
+    // typing their next, unrelated question without submitting it yet.
+    runQuery(next, askedQuestion);
   }
 
   const chipLabels: [keyof QueryDsl, string][] = dsl
@@ -126,14 +141,27 @@ export default function QueryScreen() {
           </View>
         )}
 
+        {loading && (
+          <View className="items-center py-12">
+            <ActivityIndicator color="#0066CC" size="large" />
+            <Text className="text-gray-500 text-sm mt-3">
+              {progress !== null ? `Cargando modelo… ${progress}%` : 'Interpretando tu pregunta…'}
+            </Text>
+          </View>
+        )}
+
         {error && (
           <View className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
             <Text className="text-red-700 text-sm font-medium">{error}</Text>
           </View>
         )}
 
-        {dsl && (
+        {dsl && !loading && (
           <>
+            <View className="bg-gray-100 rounded-xl rounded-br-sm p-3 mb-3 self-end">
+              <Text className="text-gray-700 text-sm">{askedQuestion}</Text>
+            </View>
+
             {(summary || summarizing) && (
               <View className="bg-blue-600 rounded-xl rounded-tl-sm p-4 mb-4">
                 {summarizing ? (
