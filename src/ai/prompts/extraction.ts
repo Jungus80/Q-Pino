@@ -14,6 +14,7 @@ Reglas:
 - "fieldStatus" para cada campo (manufacturer, model, age, count) usa: Confirmado (el colaborador vio una placa/etiqueta o verificó explícitamente), Reportado (lo afirma como hecho, sin cautela), Estimado (usa palabras como "parece", "unos", "aproximadamente", "creo"), o Desconocido (no se menciona).
 - Si el colaborador dice "tienen dos resonadores" sin más detalle, igual crea una entrada de equipment con modality MR y count 2 — no la omitas solo porque falte manufacturer/model.
 - "whichUnit" describe a cuál de varias unidades se refiere una afirmación parcial, por ejemplo "uno de los resonadores" o "el del segundo piso".
+- Antigüedad: NUNCA calcules tú el año de instalación a partir de una edad relativa — no hagas resta de "año actual menos X años", te vas a equivocar. Si el texto da una edad relativa ("8 años", "unos ocho años", "8 años de antigüedad"), usa SOLO ageYearsMin/ageYearsMax con ese número (8 y 8, o el rango si lo dan) y deja installYear en -1; el año de instalación se calcula después con código, no por ti. Usa installYear únicamente cuando el texto menciona un año calendario explícito (por ejemplo "instalado en 2018" o "es del 2018").
 - Institution.evidence debe contener el fragmento exacto donde se menciona el nombre del hospital/clínica.
 - "missing" lista, en una palabra cada uno, los campos importantes que el colaborador no mencionó (por ejemplo "manufacturer", "age", "city").
 
