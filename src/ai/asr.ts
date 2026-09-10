@@ -66,6 +66,11 @@ export function useVoiceCapture() {
         sampleRate: SAMPLE_RATE,
         channels: 1,
         encoding: 'pcm_16bit',
+        // audio-studio defaults keepAwake to true, which configures a background-capable
+        // audio session — that activation fails ("Session activation failed", OSStatus
+        // 561017449) without the "audio" UIBackgroundModes entitlement, which this
+        // foreground-only push-to-talk flow doesn't need or declare.
+        keepAwake: false,
         onAudioStream: async (event: { data: string | Float32Array | Int16Array }) => {
           if (typeof event.data !== 'string') return; // native hands back base64 PCM16LE
           setAudioLevel(rmsLevel(bytesToPCM16(toByteArray(event.data))));
