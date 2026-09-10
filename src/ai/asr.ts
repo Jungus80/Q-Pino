@@ -1,4 +1,4 @@
-import { transcribe, PARAKEET_TDT_0_6B_V3_Q4_0 } from '@qvac/sdk';
+import { transcribe, WHISPER_SMALL_Q8_0 } from '@qvac/sdk';
 import { AudioStudioModule, useAudioRecorder } from '@siteed/audio-studio';
 import { toByteArray } from 'base64-js';
 import { useCallback, useRef, useState } from 'react';
@@ -74,8 +74,11 @@ export function useVoiceCapture() {
       step = 'LOAD_MODEL';
       setIsLoadingModel(true);
       modelId = await loadExclusive({
-        modelSrc: PARAKEET_TDT_0_6B_V3_Q4_0,
-        modelType: 'parakeet-transcription',
+        modelSrc: WHISPER_SMALL_Q8_0,
+        modelType: 'whisper',
+        // 'auto' lets Whisper detect the spoken language per-clip instead of assuming
+        // Spanish — the app is used in es/pt/en per the plan.
+        modelConfig: { language: 'auto' },
       });
       setIsLoadingModel(false);
 
