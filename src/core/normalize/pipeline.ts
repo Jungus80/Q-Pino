@@ -1,7 +1,7 @@
 import { enrichFromCatalog } from './catalog';
-import { normalizeGeo } from './geo';
+import { normalizeGeo, stripTrailingPlaceName } from './geo';
 import { parseAge } from './age';
-import { isEvidenceAnchored } from './text';
+import { isEvidenceAnchored, nameSimilarity } from './text';
 import type {
   ExtractedObservation,
   NormalizedEquipment,
@@ -36,10 +36,20 @@ export function normalizeObservation(
     city: extraction.institution.city,
     country: extraction.institution.country,
   });
+
+  const rawName = extraction.institution.name;
+  const cleanedName = rawName ? stripTrailingPlaceName(rawName) : rawName;
+  const name = anchoredOrNull(cleanedName, transcript);
+
+  // A city value that's really just the institution's own name repeated (the same
+  // field-bleed bug stripTrailingPlaceName guards against, on the other field) is worse
+  // than no city at all — it would otherwise pass through as an unresolved "city".
+  const cityLooksLikeName = name != null && geo.city != null && nameSimilarity(name, geo.city) > 0.85;
+
   const institution: NormalizedInstitution = {
-    name: anchoredOrNull(extraction.institution.name, transcript),
+    name,
     site: anchoredOrNull(extraction.institution.site, transcript),
-    city: geo.city,
+    city: cityLooksLikeName ? null : geo.city,
     countryIso: geo.countryIso,
     region: geo.region,
   };

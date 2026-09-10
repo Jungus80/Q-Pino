@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findCity, findCountry, normalizeGeo } from './geo';
+import { findCity, findCountry, normalizeGeo, stripTrailingPlaceName } from './geo';
 
 describe('findCountry', () => {
   it('matches accented and unaccented Spanish names', () => {
@@ -35,5 +35,23 @@ describe('normalizeGeo', () => {
     const result = normalizeGeo({ city: 'Pueblo Desconocido', country: 'Panamá' });
     expect(result.countryIso).toBe('PA');
     expect(result.city).toBe('Pueblo Desconocido');
+  });
+});
+
+describe('stripTrailingPlaceName', () => {
+  it('strips a trailing country name', () => {
+    expect(stripTrailingPlaceName('Kestrel Norte Hospital, Colombia')).toBe('Kestrel Norte Hospital');
+  });
+
+  it('strips a trailing city name', () => {
+    expect(stripTrailingPlaceName('Hospital Andino Sur, Bogotá')).toBe('Hospital Andino Sur');
+  });
+
+  it('leaves a name with no comma untouched', () => {
+    expect(stripTrailingPlaceName('Hospital Kestrel Norte')).toBe('Hospital Kestrel Norte');
+  });
+
+  it('leaves a comma-containing name untouched when the tail is not a recognized place', () => {
+    expect(stripTrailingPlaceName('Hospital, S.A.')).toBe('Hospital, S.A.');
   });
 });

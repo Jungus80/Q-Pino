@@ -44,6 +44,38 @@ describe('normalizeObservation — institution', () => {
     const { institution } = normalizeObservation(extraction, TRANSCRIPT, NOW);
     expect(institution.name).toBeNull();
   });
+
+  it('strips a city/country the model bled into the name field, so the same client matches across visits', () => {
+    const transcript = 'Kestrel Norte Hospital, en Colombia. Un resonador Solara.';
+    const extraction = baseExtraction({
+      institution: {
+        name: 'Kestrel Norte Hospital, Colombia', // bled — should have been name + country separately
+        site: null,
+        city: null,
+        country: 'Colombia',
+        evidence: ['Kestrel Norte Hospital'],
+      },
+    });
+    const { institution } = normalizeObservation(extraction, transcript, NOW);
+    expect(institution.name).toBe('Kestrel Norte Hospital');
+    expect(institution.countryIso).toBe('CO');
+  });
+
+  it('discards a city value that is really just the institution name repeated', () => {
+    const transcript = 'Kestrel Norte Hospital. Un resonador Solara.';
+    const extraction = baseExtraction({
+      institution: {
+        name: 'Kestrel Norte Hospital',
+        site: null,
+        city: 'Kestrel Norte Hospital', // bled — the model repeated the name into city
+        country: null,
+        evidence: ['Kestrel Norte Hospital'],
+      },
+    });
+    const { institution } = normalizeObservation(extraction, transcript, NOW);
+    expect(institution.name).toBe('Kestrel Norte Hospital');
+    expect(institution.city).toBeNull();
+  });
 });
 
 describe('normalizeObservation — equipment', () => {

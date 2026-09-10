@@ -18,7 +18,8 @@ Reglas:
   - Edad relativa ("8 años", "unos ocho años", "8 años de antigüedad"): ageYearsMin/ageYearsMax = 8 (ese número, entre 0 y 60), installYear = -1.
   - Año calendario explícito ("instalado en 2018", "es del 2010", "del año 2010"): installYear = ese año (por ejemplo 2010), ageYearsMin = -1, ageYearsMax = -1. NUNCA pongas un año calendario (como 2010) en ageYearsMin/ageYearsMax — ese campo es 0-60, no un año.
   - NUNCA calcules tú "año actual menos X años" ni "años desde 20XX" — esa resta la hace el código después, no tú.
-- Institution.evidence debe contener el fragmento exacto donde se menciona el nombre del hospital/clínica.
+- Institution: separa SIEMPRE name, site, city y country en sus propios campos — nunca combines dos de ellos en uno solo. "name" es solo el nombre propio del hospital/clínica, sin ciudad ni país ni comas pegadas (ej. si dicen "Hospital Kestrel Norte, en Bogotá, Colombia", name="Hospital Kestrel Norte", city="Bogotá", country="Colombia" — NUNCA name="Hospital Kestrel Norte, Colombia" ni city="Hospital Kestrel Norte"). Esto es crítico: un nombre de cliente escrito de forma distinta entre visitas hace que el sistema no reconozca que es el mismo cliente.
+- Institution.evidence debe contener el fragmento exacto donde se menciona el nombre del hospital/clínica (solo el nombre, no la ciudad ni el país).
 - "missing" lista, en una palabra cada uno, los campos importantes que el colaborador no mencionó (por ejemplo "manufacturer", "age", "city").
 
 Responde solo con el JSON que pide el esquema.`;

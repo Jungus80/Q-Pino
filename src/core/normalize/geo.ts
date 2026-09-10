@@ -78,3 +78,24 @@ export function normalizeGeo(input: { city?: string | null; country?: string | n
   }
   return { city: input.city || null, countryIso: null, region: null };
 }
+
+/**
+ * Strips a trailing ", <city or country>" segment from an institution name — a small
+ * on-device model occasionally bleeds the city/country into the name field instead of
+ * keeping them separate ("Kestrel Norte Hospital, Colombia" instead of name="Kestrel
+ * Norte Hospital" + country="Colombia"), which then quietly breaks institution matching
+ * across visits (the same client, differently contaminated, scores as two different
+ * names). This is a defense-in-depth cleanup on top of the extraction prompt telling the
+ * model not to do this in the first place.
+ */
+export function stripTrailingPlaceName(name: string): string {
+  const lastComma = name.lastIndexOf(',');
+  if (lastComma === -1) return name;
+
+  const head = name.slice(0, lastComma).trim();
+  const tail = name.slice(lastComma + 1).trim();
+  if (!head || !tail) return name;
+
+  if (findCountry(tail) || findCity(tail)) return head;
+  return name;
+}
