@@ -22,10 +22,11 @@ export type DashboardInstitutionInput = {
   countryIso: string | null;
 };
 
-const AGE_BUCKETS = ['0–3 años', '4–7 años', '8–10 años', '11+ años', 'Desconocida'] as const;
+export const AGE_BUCKETS = ['0–3 años', '4–7 años', '8–10 años', '11+ años', 'Desconocida'] as const;
+export type AgeBucket = (typeof AGE_BUCKETS)[number];
 const STALE_DAYS = 365;
 
-function ageMidpoint(lo: number | null, hi: number | null, now: Date): number | null {
+export function ageMidpoint(lo: number | null, hi: number | null, now: Date): number | null {
   if (lo == null && hi == null) return null;
   const currentYear = now.getFullYear();
   const l = lo ?? hi!;
@@ -33,12 +34,18 @@ function ageMidpoint(lo: number | null, hi: number | null, now: Date): number | 
   return currentYear - (l + h) / 2;
 }
 
-function ageBucket(ageYears: number | null): (typeof AGE_BUCKETS)[number] {
+function ageBucket(ageYears: number | null): AgeBucket {
   if (ageYears == null) return 'Desconocida';
   if (ageYears <= 3) return '0–3 años';
   if (ageYears <= 7) return '4–7 años';
   if (ageYears <= 10) return '8–10 años';
   return '11+ años';
+}
+
+/** Exported so the dashboard UI can filter equipment by the exact same bucket a tapped
+ * age-distribution bar represents, instead of re-deriving the boundaries itself. */
+export function ageBucketForRange(lo: number | null, hi: number | null, now: Date): AgeBucket {
+  return ageBucket(ageMidpoint(lo, hi, now));
 }
 
 export type DashboardData = {

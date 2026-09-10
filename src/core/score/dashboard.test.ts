@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeDashboard, type DashboardEquipmentInput, type DashboardInstitutionInput } from './dashboard';
+import { ageBucketForRange, computeDashboard, type DashboardEquipmentInput, type DashboardInstitutionInput } from './dashboard';
 
 const NOW = new Date('2026-09-10T00:00:00Z');
 
@@ -98,5 +98,16 @@ describe('computeDashboard', () => {
     expect(result.totalEquipment).toBe(0);
     expect(result.avgConfidence).toBe(0);
     expect(result.agingClients).toHaveLength(0);
+  });
+});
+
+describe('ageBucketForRange', () => {
+  it('matches the same buckets used by the aggregate — used by the dashboard UI to filter', () => {
+    const y = NOW.getFullYear();
+    expect(ageBucketForRange(y - 2, y - 2, NOW)).toBe('0–3 años');
+    expect(ageBucketForRange(y - 5, y - 5, NOW)).toBe('4–7 años');
+    expect(ageBucketForRange(y - 9, y - 9, NOW)).toBe('8–10 años');
+    expect(ageBucketForRange(y - 15, y - 15, NOW)).toBe('11+ años');
+    expect(ageBucketForRange(null, null, NOW)).toBe('Desconocida');
   });
 });
