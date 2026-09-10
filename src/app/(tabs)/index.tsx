@@ -5,7 +5,7 @@ import { saveObservation } from '@/db/saveObservation';
 import { extractObservation } from '@/ai/extract';
 import { useVoiceCapture } from '@/ai/asr';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -23,6 +23,36 @@ function StatusChip({ status, onPress }: { status: FieldStatus; onPress: () => v
     <Pressable onPress={onPress} className={`px-2 py-0.5 rounded-full ${STATUS_COLOR[status]}`}>
       <Text className="text-white text-xs font-medium">{status}</Text>
     </Pressable>
+  );
+}
+
+const WAVEFORM_BARS = 20;
+
+/**
+ * Live mic-level waveform, driven directly from raw audio (not the ASR's transcript
+ * output) so it stays visibly responsive during the 1-3s gaps between Parakeet's partial
+ * transcript updates — closes the "is this frozen?" perception gap that comes from
+ * on-device streaming ASR's inherent chunking latency.
+ */
+function Waveform({ level }: { level: number }) {
+  const historyRef = useRef<number[]>(new Array(WAVEFORM_BARS).fill(0));
+  const [, forceRender] = useState(0);
+
+  useEffect(() => {
+    historyRef.current = [...historyRef.current.slice(1), level];
+    forceRender((n) => n + 1);
+  }, [level]);
+
+  return (
+    <View className="flex-row items-center gap-1 h-8">
+      {historyRef.current.map((v, i) => (
+        <View
+          key={i}
+          className="flex-1 bg-red-400 rounded-full"
+          style={{ height: Math.max(3, v * 32), opacity: 0.4 + v * 0.6 }}
+        />
+      ))}
+    </View>
   );
 }
 
@@ -116,9 +146,14 @@ export default function CaptureScreen() {
           <>
             {voice.isRecording ? (
               <View className="bg-neutral-900 rounded-xl p-4 min-h-32">
-                <View className="flex-row items-center mb-2">
-                  <View className="w-2 h-2 rounded-full bg-red-500 mr-2" />
-                  <Text className="text-red-400 text-xs font-medium">Grabando…</Text>
+                <View className="flex-row items-center justify-between mb-3">
+                  <View className="flex-row items-center">
+                    <View className="w-2 h-2 rounded-full bg-red-500 mr-2" />
+                    <Text className="text-red-400 text-xs font-medium">Grabando…</Text>
+                  </View>
+                  <View className="flex-1 ml-4">
+                    <Waveform level={voice.audioLevel} />
+                  </View>
                 </View>
                 <Text className="text-white text-base">
                   {voice.partialText || 'Escuchando…'}

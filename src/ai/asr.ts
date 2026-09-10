@@ -3,7 +3,7 @@ import { AudioStudioModule, useAudioRecorder } from '@siteed/audio-studio';
 import { toByteArray } from 'base64-js';
 import { useCallback, useRef, useState } from 'react';
 import { loadExclusive, unloadCurrentModel } from './modelManager';
-import { bytesToPCM16, pcm16ToBytes, resamplePCM16 } from './resample';
+import { bytesToPCM16, pcm16ToBytes, resamplePCM16, rmsLevel } from './resample';
 
 // The QVAC ASR models expect 16kHz; the recorder captures at this standard hardware
 // rate instead (44.1kHz caused no native failures in testing, whereas requesting 16kHz
@@ -24,6 +24,9 @@ export function useVoiceCapture() {
   const [isRecording, setIsRecording] = useState(false);
   const [isLoadingModel, setIsLoadingModel] = useState(false);
   const [partialText, setPartialText] = useState('');
+  const [audioLevel, setAudioLevel] = useState(0); // 0-1, updates every audio chunk (~100-300ms) —
+  // independent of the ASR's slower partial-text cadence, so the UI can stay visibly "alive"
+  // during the 1-3s gaps between transcript updates instead of looking frozen/laggy.
   const [error, setError] = useState<string | null>(null);
 
   const sessionRef = useRef<TranscribeStreamSession | null>(null);
@@ -55,6 +58,7 @@ export function useVoiceCapture() {
     busyRef.current = true;
     setError(null);
     setPartialText('');
+    setAudioLevel(0);
     textRef.current = '';
     setIsLoadingModel(true);
     // Every previous fix attempt (audio format, sample rate, streaming:true) produced
@@ -74,7 +78,15 @@ export function useVoiceCapture() {
       const modelId = await loadExclusive({
         modelSrc: PARAKEET_TDT_0_6B_V3_Q4_0,
         modelType: 'parakeet-transcription',
-        modelConfig: { streaming: true, streamingEmitPartials: true },
+        modelConfig: {
+          streaming: true,
+          streamingEmitPartials: true,
+          // Default encoder cadence is 2000ms — that's the 1-3s gap between transcript
+          // updates. Shorter chunks trade a little transcription context for a
+          // noticeably snappier feel; 800ms is still enough audio per chunk for Parakeet
+          // to transcribe accurately at conversational speech rates.
+          streamingChunkMs: 800,
+        },
       });
       setIsLoadingModel(false);
 
@@ -101,6 +113,7 @@ export function useVoiceCapture() {
         onAudioStream: async (event: { data: string | Float32Array | Int16Array }) => {
           if (typeof event.data !== 'string') return; // native hands back base64 PCM16LE
           const captured = bytesToPCM16(toByteArray(event.data));
+          setAudioLevel(rmsLevel(captured));
           const resampled = resamplePCM16(captured, CAPTURE_SAMPLE_RATE, TARGET_SAMPLE_RATE);
           session.write(pcm16ToBytes(resampled));
         },
@@ -118,6 +131,7 @@ export function useVoiceCapture() {
 
   const stop = useCallback(async (): Promise<string> => {
     setIsRecording(false);
+    setAudioLevel(0);
     try {
       await stopRecording();
     } catch {
@@ -127,5 +141,5 @@ export function useVoiceCapture() {
     return textRef.current;
   }, [stopRecording, cleanup]);
 
-  return { isRecording, isLoadingModel, partialText, error, start, stop };
+  return { isRecording, isLoadingModel, partialText, audioLevel, error, start, stop };
 }

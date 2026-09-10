@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bytesToPCM16, pcm16ToBytes, resamplePCM16 } from './resample';
+import { bytesToPCM16, pcm16ToBytes, resamplePCM16, rmsLevel } from './resample';
 
 describe('resamplePCM16', () => {
   it('is a no-op when rates match', () => {
@@ -36,5 +36,27 @@ describe('bytesToPCM16 / pcm16ToBytes', () => {
     const bytes = pcm16ToBytes(samples);
     const roundTripped = bytesToPCM16(bytes);
     expect(Array.from(roundTripped)).toEqual(Array.from(samples));
+  });
+});
+
+describe('rmsLevel', () => {
+  it('returns 0 for silence', () => {
+    expect(rmsLevel(new Int16Array(100).fill(0))).toBe(0);
+  });
+
+  it('returns near 1 for a full-scale signal', () => {
+    const samples = new Int16Array(100);
+    for (let i = 0; i < samples.length; i++) samples[i] = i % 2 === 0 ? 32767 : -32768;
+    expect(rmsLevel(samples)).toBeGreaterThan(0.95);
+  });
+
+  it('increases monotonically with amplitude', () => {
+    const quiet = new Int16Array(100).fill(500);
+    const loud = new Int16Array(100).fill(10000);
+    expect(rmsLevel(loud)).toBeGreaterThan(rmsLevel(quiet));
+  });
+
+  it('handles an empty array', () => {
+    expect(rmsLevel(new Int16Array(0))).toBe(0);
   });
 });

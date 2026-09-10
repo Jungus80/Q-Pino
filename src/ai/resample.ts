@@ -30,3 +30,21 @@ export function bytesToPCM16(bytes: Uint8Array): Int16Array {
 export function pcm16ToBytes(samples: Int16Array): Uint8Array {
   return new Uint8Array(samples.buffer, samples.byteOffset, samples.byteLength);
 }
+
+/**
+ * RMS (root-mean-square) amplitude of a PCM16 chunk, normalized to roughly 0-1 for driving
+ * a live level meter. Uses a light log scale (like a VU meter) so quiet speech is still
+ * visible instead of being crushed near zero by a linear scale.
+ */
+export function rmsLevel(samples: Int16Array): number {
+  if (samples.length === 0) return 0;
+  let sumSquares = 0;
+  for (let i = 0; i < samples.length; i++) {
+    const normalized = samples[i] / 32768;
+    sumSquares += normalized * normalized;
+  }
+  const rms = Math.sqrt(sumSquares / samples.length);
+  // -50dB (near-silence) -> 0, 0dB (full scale) -> 1, log-scaled in between.
+  const db = 20 * Math.log10(Math.max(rms, 1e-5));
+  return Math.max(0, Math.min(1, (db + 50) / 50));
+}
