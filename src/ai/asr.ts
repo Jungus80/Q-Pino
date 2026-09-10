@@ -57,11 +57,12 @@ export function useVoiceCapture() {
     setPartialText('');
     textRef.current = '';
     setIsLoadingModel(true);
+    // Every previous fix attempt (audio format, sample rate, streaming:true) produced
+    // the byte-for-byte identical native error, which means guessing which awaited call
+    // actually threw was unreliable — instrument each step so the error message itself
+    // says which one failed instead of continuing to guess blind.
+    let step = 'PERMISSION';
     try {
-      // startRecording() never requests mic permission itself — on iOS this makes it
-      // fail with an unlocalized native error ("undefined reason") instead of ever
-      // showing the system prompt, because the permission status starts as
-      // "undetermined" and the native code doesn't request-and-await it first.
       const permission = await AudioStudioModule.requestPermissionsAsync();
       if (!permission.granted) {
         throw new Error(
@@ -69,20 +70,19 @@ export function useVoiceCapture() {
         );
       }
 
+      step = 'LOAD_MODEL';
       const modelId = await loadExclusive({
         modelSrc: PARAKEET_TDT_0_6B_V3_Q4_0,
         modelType: 'parakeet-transcription',
-        // Parakeet's streaming duplex mode is configured at LOAD time, not per-call —
-        // opening a transcribeStream() session against a model loaded without this
-        // almost certainly explains the native error every audio-format attempt hit
-        // identically: the session itself was never viable, regardless of the audio.
         modelConfig: { streaming: true, streamingEmitPartials: true },
       });
       setIsLoadingModel(false);
 
+      step = 'OPEN_STREAM';
       const session = (await transcribeStream({ modelId })) as TranscribeStreamSession;
       sessionRef.current = session;
 
+      step = 'DRAIN_LOOP_SETUP';
       drainPromiseRef.current = (async () => {
         for await (const chunk of session) {
           const text = typeof chunk === 'string' ? chunk : (chunk as { text?: string }).text ?? '';
@@ -93,14 +93,10 @@ export function useVoiceCapture() {
         }
       })();
 
+      step = 'START_RECORDING';
       await startRecording({
         sampleRate: CAPTURE_SAMPLE_RATE,
         channels: 1,
-        // pcm_16bit + the default 'raw' streamFormat is audio-studio's most-exercised
-        // native path (its Quick Start example). Both pcm_32bit+streamFormat:'float32'
-        // and pcm_16bit at 16kHz directly threw an unlocalized native error on-device
-        // ("undefined reason") — capturing at the standard 44.1kHz rate and downsampling
-        // in JS (below) sidesteps whatever native audio-engine path that hit.
         encoding: 'pcm_16bit',
         onAudioStream: async (event: { data: string | Float32Array | Int16Array }) => {
           if (typeof event.data !== 'string') return; // native hands back base64 PCM16LE
@@ -111,9 +107,9 @@ export function useVoiceCapture() {
       });
       setIsRecording(true);
     } catch (e: any) {
-      console.error('[voice] start failed:', e);
+      console.error(`[voice] start failed at step ${step}:`, e, e?.stack);
       setIsLoadingModel(false);
-      setError(e?.message || e?.code || JSON.stringify(e) || 'Error desconocido al iniciar la grabación');
+      setError(`[${step}] ` + (e?.message || e?.code || JSON.stringify(e) || 'Error desconocido'));
       await cleanup();
     } finally {
       busyRef.current = false;
