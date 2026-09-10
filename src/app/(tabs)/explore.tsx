@@ -1,9 +1,10 @@
 import { listInstitutions, type InstitutionRow } from '@/db/repos/institutions';
 import { listAllEquipment, listEquipmentForInstitution } from '@/db/repos/equipment';
 import { seedIfEmpty } from '@/db/seed';
+import { resetDb } from '@/db/client';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 type InstitutionSummary = InstitutionRow & { equipmentCount: number; modalities: string[] };
@@ -45,6 +46,24 @@ export default function ClientsScreen() {
     }, [load])
   );
 
+  function handleReset() {
+    Alert.alert(
+      'Reiniciar datos de prueba',
+      'Borra todos los clientes y equipos guardados y vuelve a cargar los 5 clientes ficticios de siembra. Esto no se puede deshacer.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Reiniciar',
+          style: 'destructive',
+          onPress: async () => {
+            await resetDb();
+            await load();
+          },
+        },
+      ]
+    );
+  }
+
   if (loading) {
     return (
       <SafeAreaView className="flex-1 bg-neutral-950 items-center justify-center">
@@ -56,7 +75,12 @@ export default function ClientsScreen() {
   return (
     <SafeAreaView className="flex-1 bg-neutral-950">
       <View className="px-4 pt-2 pb-3">
-        <Text className="text-white text-2xl font-bold mb-1">Clientes</Text>
+        <View className="flex-row items-center justify-between">
+          <Text className="text-white text-2xl font-bold mb-1">Clientes</Text>
+          <Pressable onPress={handleReset}>
+            <Text className="text-red-400 text-xs">Reiniciar datos</Text>
+          </Pressable>
+        </View>
         <Text className="text-neutral-400 mb-3">
           {institutions.length} clientes · {Object.values(totalsByModality).reduce((a, b) => a + b, 0)} equipos
         </Text>
