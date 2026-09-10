@@ -43,6 +43,13 @@ function fromRow(row: any): EquipmentRow {
   };
 }
 
+export async function getEquipmentById(id: string): Promise<EquipmentRow | null> {
+  const db = await getDb();
+  const res = await db.execute('SELECT * FROM equipment WHERE id = ?', [id]);
+  const row = res.rows?.[0];
+  return row ? fromRow(row) : null;
+}
+
 export async function listEquipmentForInstitution(institutionId: string): Promise<EquipmentRow[]> {
   const db = await getDb();
   const res = await db.execute(

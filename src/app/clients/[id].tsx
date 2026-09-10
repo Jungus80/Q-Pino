@@ -1,9 +1,9 @@
 import { computeConfidence } from '@/core/score/confidence';
 import { getInstitution, type InstitutionRow } from '@/db/repos/institutions';
 import { listEquipmentForInstitution, type EquipmentRow } from '@/db/repos/equipment';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const BAND_COLOR: Record<'Alta' | 'Media' | 'Baja', string> = {
@@ -69,6 +69,7 @@ function groupByModality(rows: EquipmentRow[], now: Date): ModalityGroup[] {
 
 export default function ClientDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [institution, setInstitution] = useState<InstitutionRow | null>(null);
   const [groups, setGroups] = useState<ModalityGroup[]>([]);
@@ -134,12 +135,18 @@ export default function ClientDetailScreen() {
                 <Text className="text-white text-lg font-semibold">{g.ageLabel}</Text>
               </View>
             </View>
-            <View className="mt-3 border-t border-neutral-800 pt-2">
+            <View className="mt-3 border-t border-neutral-800 pt-1">
               {g.items.map((item) => (
-                <Text key={item.id} className="text-neutral-400 text-xs mb-1">
-                  {[item.manufacturer, item.model].filter(Boolean).join(' ') || 'Fabricante/modelo desconocido'}
-                  {item.count != null ? ` · ${item.count} unidad(es)` : ''}
-                </Text>
+                <Pressable
+                  key={item.id}
+                  onPress={() => router.push(`/equipment/${item.id}`)}
+                  className="flex-row items-center justify-between py-1.5">
+                  <Text className="text-neutral-400 text-xs flex-1">
+                    {[item.manufacturer, item.model].filter(Boolean).join(' ') || 'Fabricante/modelo desconocido'}
+                    {item.count != null ? ` · ${item.count} unidad(es)` : ''}
+                  </Text>
+                  <Text className="text-neutral-600 text-xs">›</Text>
+                </Pressable>
               ))}
             </View>
           </View>

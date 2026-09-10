@@ -1,30 +1,16 @@
 import { normalizeObservation } from '@/core/normalize/pipeline';
-import type { ExtractedObservation, FieldStatus, Modality, NormalizedEquipment, NormalizedInstitution } from '@/core/schema/observation';
-import { FIELD_STATUSES, MODALITIES } from '@/core/schema/observation';
+import type { ExtractedObservation, Modality, NormalizedEquipment, NormalizedInstitution } from '@/core/schema/observation';
+import { MODALITIES } from '@/core/schema/observation';
 import { saveObservation } from '@/db/saveObservation';
 import { extractObservation } from '@/ai/extract';
 import { useVoiceCapture } from '@/ai/asr';
+import { StatusChip, cycleStatus } from '@/components/StatusChip';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Screen = 'input' | 'extracting' | 'review' | 'saving';
-
-const STATUS_COLOR: Record<FieldStatus, string> = {
-  Confirmado: 'bg-emerald-500',
-  Reportado: 'bg-blue-500',
-  Estimado: 'bg-amber-500',
-  Desconocido: 'bg-neutral-600',
-};
-
-function StatusChip({ status, onPress }: { status: FieldStatus; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress} className={`px-2 py-0.5 rounded-full ${STATUS_COLOR[status]}`}>
-      <Text className="text-white text-xs font-medium">{status}</Text>
-    </Pressable>
-  );
-}
 
 const WAVEFORM_BARS = 20;
 
@@ -54,11 +40,6 @@ function Waveform({ level }: { level: number }) {
       ))}
     </View>
   );
-}
-
-function cycleStatus(current: FieldStatus): FieldStatus {
-  const i = FIELD_STATUSES.indexOf(current);
-  return FIELD_STATUSES[(i + 1) % FIELD_STATUSES.length];
 }
 
 export default function CaptureScreen() {
