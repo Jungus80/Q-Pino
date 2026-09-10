@@ -1,0 +1,49 @@
+{
+  "_comment": "Small offline gazetteer for demo geo-normalization: ISO-3166 country name -> code (LatAm-focused, plus common English/Portuguese variants), region membership, and a handful of major cities per country for fuzzy city matching. Not exhaustive — extend as needed.",
+  "regions": [
+    { "code": "LATAM", "name": "Latinoamérica" },
+    { "code": "NA", "name": "Norteamérica" },
+    { "code": "EU", "name": "Europa" }
+  ],
+  "countries": [
+    { "iso": "PA", "region": "LATAM", "names": ["panama", "panamá", "republica de panama"] },
+    { "iso": "BR", "region": "LATAM", "names": ["brasil", "brazil", "republica federativa do brasil"] },
+    { "iso": "MX", "region": "LATAM", "names": ["mexico", "méxico", "estados unidos mexicanos"] },
+    { "iso": "CO", "region": "LATAM", "names": ["colombia", "republica de colombia"] },
+    { "iso": "AR", "region": "LATAM", "names": ["argentina", "republica argentina"] },
+    { "iso": "CL", "region": "LATAM", "names": ["chile", "republica de chile"] },
+    { "iso": "PE", "region": "LATAM", "names": ["peru", "perú", "republica del peru"] },
+    { "iso": "EC", "region": "LATAM", "names": ["ecuador", "republica del ecuador"] },
+    { "iso": "CR", "region": "LATAM", "names": ["costa rica"] },
+    { "iso": "GT", "region": "LATAM", "names": ["guatemala"] },
+    { "iso": "DO", "region": "LATAM", "names": ["republica dominicana", "dominican republic"] },
+    { "iso": "UY", "region": "LATAM", "names": ["uruguay"] },
+    { "iso": "PY", "region": "LATAM", "names": ["paraguay"] },
+    { "iso": "BO", "region": "LATAM", "names": ["bolivia"] },
+    { "iso": "SV", "region": "LATAM", "names": ["el salvador"] },
+    { "iso": "HN", "region": "LATAM", "names": ["honduras"] },
+    { "iso": "NI", "region": "LATAM", "names": ["nicaragua"] },
+    { "iso": "US", "region": "NA", "names": ["estados unidos", "united states", "usa", "eeuu", "ee uu"] },
+    { "iso": "ES", "region": "EU", "names": ["espana", "españa", "spain"] },
+    { "iso": "PT", "region": "EU", "names": ["portugal"] }
+  ],
+  "cities": [
+    { "name": "Ciudad de Panamá", "countryIso": "PA", "lat": 8.9824, "lon": -79.5199, "aliases": ["panama city", "ciudad de panama"] },
+    { "name": "São Paulo", "countryIso": "BR", "lat": -23.5505, "lon": -46.6333, "aliases": ["sao paulo"] },
+    { "name": "Rio de Janeiro", "countryIso": "BR", "lat": -22.9068, "lon": -43.1729, "aliases": ["rio"] },
+    { "name": "Brasília", "countryIso": "BR", "lat": -15.7939, "lon": -47.8828, "aliases": ["brasilia"] },
+    { "name": "Ciudad de México", "countryIso": "MX", "lat": 19.4326, "lon": -99.1332, "aliases": ["mexico city", "ciudad de mexico", "cdmx"] },
+    { "name": "Bogotá", "countryIso": "CO", "lat": 4.711, "lon": -74.0721, "aliases": ["bogota"] },
+    { "name": "Medellín", "countryIso": "CO", "lat": 6.2442, "lon": -75.5812, "aliases": ["medellin"] },
+    { "name": "Buenos Aires", "countryIso": "AR", "lat": -34.6037, "lon": -58.3816, "aliases": [] },
+    { "name": "Santiago", "countryIso": "CL", "lat": -33.4489, "lon": -70.6693, "aliases": [] },
+    { "name": "Lima", "countryIso": "PE", "lat": -12.0464, "lon": -77.0428, "aliases": [] },
+    { "name": "Quito", "countryIso": "EC", "lat": -0.1807, "lon": -78.4678, "aliases": [] },
+    { "name": "San José", "countryIso": "CR", "lat": 9.9281, "lon": -84.0907, "aliases": ["san jose"] },
+    { "name": "Ciudad de Guatemala", "countryIso": "GT", "lat": 14.6349, "lon": -90.5069, "aliases": ["guatemala city"] },
+    { "name": "Santo Domingo", "countryIso": "DO", "lat": 18.4861, "lon": -69.9312, "aliases": [] },
+    { "name": "Montevideo", "countryIso": "UY", "lat": -34.9011, "lon": -56.1645, "aliases": [] },
+    { "name": "Asunción", "countryIso": "PY", "lat": -25.2637, "lon": -57.5759, "aliases": ["asuncion"] },
+    { "name": "La Paz", "countryIso": "BO", "lat": -16.5, "lon": -68.15, "aliases": [] }
+  ]
+}

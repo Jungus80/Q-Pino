@@ -1,0 +1,75 @@
+{
+  "_comment": "Fictional manufacturers and models for the hackathon demo, per the PDF's data guardrail. Swap this file for a real catalog without touching any other code.",
+  "manufacturers": [
+    {
+      "id": "solara",
+      "name": "Solara Health",
+      "aliases": ["solara", "solara health", "solara medical"]
+    },
+    {
+      "id": "meridian",
+      "name": "Meridian Diagnostics",
+      "aliases": ["meridian", "meridian diagnostics", "meridian dx"]
+    },
+    {
+      "id": "northfield",
+      "name": "Northfield Medical",
+      "aliases": ["northfield", "northfield medical"]
+    },
+    {
+      "id": "verdant",
+      "name": "Verdant Imaging",
+      "aliases": ["verdant", "verdant imaging"]
+    },
+    {
+      "id": "kestrel",
+      "name": "Kestrel Health Systems",
+      "aliases": ["kestrel", "kestrel health"]
+    },
+    {
+      "id": "halcyon",
+      "name": "Halcyon Medical",
+      "aliases": ["halcyon", "halcyon medical"]
+    }
+  ],
+  "models": [
+    { "id": "solara-magna-1.5t", "manufacturerId": "solara", "name": "Solara Magna 1.5T", "modality": "MR", "launchYear": 2015, "endOfSupportYear": 2027 },
+    { "id": "solara-magna-x", "manufacturerId": "solara", "name": "Solara Magna X", "modality": "MR", "launchYear": 2020, "endOfSupportYear": 2032 },
+    { "id": "solara-aria-3t", "manufacturerId": "solara", "name": "Solara Aria 3T", "modality": "MR", "launchYear": 2022, "endOfSupportYear": 2034 },
+    { "id": "solara-spectra-64", "manufacturerId": "solara", "name": "Solara Spectra 64", "modality": "CT", "launchYear": 2014, "endOfSupportYear": 2026 },
+    { "id": "solara-spectra-elite", "manufacturerId": "solara", "name": "Solara Spectra Elite", "modality": "CT", "launchYear": 2019, "endOfSupportYear": 2031 },
+
+    { "id": "meridian-pulse", "manufacturerId": "meridian", "name": "Meridian Pulse", "modality": "MR", "launchYear": 2012, "endOfSupportYear": 2024 },
+    { "id": "meridian-pulse-ii", "manufacturerId": "meridian", "name": "Meridian Pulse II", "modality": "MR", "launchYear": 2018, "endOfSupportYear": 2030 },
+    { "id": "meridian-wave", "manufacturerId": "meridian", "name": "Meridian Wave", "modality": "US", "launchYear": 2017, "endOfSupportYear": 2027 },
+    { "id": "meridian-wave-pro", "manufacturerId": "meridian", "name": "Meridian Wave Pro", "modality": "US", "launchYear": 2021, "endOfSupportYear": 2031 },
+
+    { "id": "northfield-vantage-32", "manufacturerId": "northfield", "name": "Northfield Vantage 32", "modality": "CT", "launchYear": 2011, "endOfSupportYear": 2023 },
+    { "id": "northfield-vantage-128", "manufacturerId": "northfield", "name": "Northfield Vantage 128", "modality": "CT", "launchYear": 2020, "endOfSupportYear": 2032 },
+    { "id": "northfield-duraray", "manufacturerId": "northfield", "name": "Northfield DuraRay", "modality": "XR", "launchYear": 2016, "endOfSupportYear": 2028 },
+
+    { "id": "verdant-echoline", "manufacturerId": "verdant", "name": "Verdant EchoLine", "modality": "US", "launchYear": 2015, "endOfSupportYear": 2025 },
+    { "id": "verdant-echoline-2", "manufacturerId": "verdant", "name": "Verdant EchoLine 2", "modality": "US", "launchYear": 2020, "endOfSupportYear": 2030 },
+    { "id": "verdant-clarity", "manufacturerId": "verdant", "name": "Verdant Clarity", "modality": "MG", "launchYear": 2018, "endOfSupportYear": 2028 },
+
+    { "id": "kestrel-vitalwatch", "manufacturerId": "kestrel", "name": "Kestrel VitalWatch", "modality": "MONITORING", "launchYear": 2019, "endOfSupportYear": 2027 },
+    { "id": "kestrel-flowtrace", "manufacturerId": "kestrel", "name": "Kestrel FlowTrace", "modality": "ANGIO", "launchYear": 2017, "endOfSupportYear": 2027 },
+
+    { "id": "halcyon-fusion", "manufacturerId": "halcyon", "name": "Halcyon Fusion", "modality": "PET_CT", "launchYear": 2016, "endOfSupportYear": 2026 },
+    { "id": "halcyon-gammaview", "manufacturerId": "halcyon", "name": "Halcyon GammaView", "modality": "NM", "launchYear": 2013, "endOfSupportYear": 2025 },
+    { "id": "halcyon-spectracam", "manufacturerId": "halcyon", "name": "Halcyon SpectraCam", "modality": "SPECT", "launchYear": 2015, "endOfSupportYear": 2027 }
+  ],
+  "renewalThresholdYears": {
+    "MR": 10,
+    "CT": 8,
+    "US": 6,
+    "XR": 10,
+    "MG": 8,
+    "PET_CT": 9,
+    "SPECT": 9,
+    "NM": 9,
+    "ANGIO": 9,
+    "MONITORING": 7,
+    "OTHER": 10
+  }
+}

@@ -10,6 +10,7 @@
     "ios": {
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "io.qvac.installedbase",
+      "appleTeamId": "33M83H9SVB",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Se usa el micrófono para dictar observaciones de equipos durante la visita.",
         "NSCameraUsageDescription": "Se usa la cámara para fotografiar placas y etiquetas de los equipos.",
