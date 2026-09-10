@@ -21,6 +21,12 @@ export async function scanPlate(imagePath: string, modality?: Modality | null, o
     {
       modelSrc: OCR_LATIN,
       modelType: MODEL_TYPES.ggmlOcr,
+      // The iPhone camera hands back a ~4000px-wide photo; the CRAFT text detector's
+      // default working canvas is sized for that and blew past the backend's graph
+      // allocation limit ("ggml_gallocr_alloc_graph failed") on-device. Capping the
+      // canvas keeps the detector's intermediate tensors bounded regardless of the
+      // input photo's resolution.
+      modelConfig: { canvasSize: 1280 },
       onProgress,
     },
     async (modelId) => {
