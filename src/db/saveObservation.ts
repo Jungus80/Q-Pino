@@ -178,32 +178,57 @@ export async function saveObservation(input: SaveObservationInput): Promise<Save
     const existingRows = await listEquipmentForInstitutionModality(institutionId, item.modality);
 
     if (!hasDetails) {
-      // A bare fleet-count claim ("tienen dos resonadores") with nothing distinguishing
-      // one unit from another. Reconcile against a single existing aggregate row if
-      // there's exactly one; otherwise this is either brand new or the fleet has already
-      // been split into distinct tracked units, in which case a bare count claim can't
-      // be safely folded into any one of them — record it as its own row for visibility.
-      if (item.count == null) {
+      // A bare fleet-level claim ("tienen dos resonadores", "son del año 2010") with
+      // nothing distinguishing one unit from another. It can still carry a count and/or
+      // an age — both get reconciled against a single existing aggregate row when there's
+      // exactly one; a claim with neither count nor age has nothing to reconcile at all.
+      // With more than one existing row, the fleet has already been split into distinct
+      // tracked units, so a bare claim can't be safely folded into any one of them —
+      // record it as its own row for visibility instead of guessing which unit it means.
+      if (item.count == null && item.installYearLo == null) {
         outcomes.push({ kind: 'skipped_no_count_no_details', modality: item.modality });
         continue;
       }
 
       const soleAggregate = existingRows.length === 1 ? existingRows[0] : null;
       if (soleAggregate) {
-        const reconciled = reconcileCount(
-          { count: soleAggregate.count ?? soleAggregate.count!, status: soleAggregate.statusCount, observedAt: soleAggregate.lastVerifiedAt },
-          { count: item.count, status: item.fieldStatus.count, observedAt: now }
-        );
-        await updateEquipmentFields(soleAggregate.id, {
-          count: reconciled.count,
-          statusCount: reconciled.status,
-          lastVerifiedAt: now,
-        });
-        claims.push(claim(base, { institutionId: null, equipmentId: soleAggregate.id }, 'count', item.count, item.fieldStatus.count, evidence));
+        const patch: Parameters<typeof updateEquipmentFields>[1] = { lastVerifiedAt: now };
+        const changedFields: string[] = [];
+        let conflict = false;
+
+        if (item.count != null) {
+          const reconciled = reconcileCount(
+            { count: soleAggregate.count ?? 0, status: soleAggregate.statusCount, observedAt: soleAggregate.lastVerifiedAt },
+            { count: item.count, status: item.fieldStatus.count, observedAt: now }
+          );
+          patch.count = reconciled.count;
+          patch.statusCount = reconciled.status;
+          conflict = reconciled.conflict;
+          changedFields.push('count');
+          claims.push(claim(base, { institutionId: null, equipmentId: soleAggregate.id }, 'count', item.count, item.fieldStatus.count, evidence));
+        }
+
+        if (item.installYearLo != null) {
+          const r = chooseBetween(
+            soleAggregate.installYearLo != null
+              ? { value: soleAggregate.installYearLo, status: soleAggregate.statusAge, observedAt: soleAggregate.lastVerifiedAt }
+              : null,
+            { value: item.installYearLo, status: item.fieldStatus.age, observedAt: now }
+          );
+          if (r.changed) {
+            patch.installYearLo = item.installYearLo;
+            patch.installYearHi = item.installYearHi;
+            patch.statusAge = r.status;
+            changedFields.push('age');
+          }
+          claims.push(claim(base, { institutionId: null, equipmentId: soleAggregate.id }, 'installYear', item.installYearLo, item.fieldStatus.age, evidence));
+        }
+
+        await updateEquipmentFields(soleAggregate.id, patch);
         outcomes.push(
-          reconciled.conflict
-            ? { kind: 'count_conflict', equipmentId: soleAggregate.id, modality: item.modality, existingCount: soleAggregate.count ?? 0, incomingCount: item.count }
-            : { kind: 'updated', equipmentId: soleAggregate.id, modality: item.modality, changedFields: ['count'] }
+          conflict
+            ? { kind: 'count_conflict', equipmentId: soleAggregate.id, modality: item.modality, existingCount: soleAggregate.count ?? 0, incomingCount: item.count ?? 0 }
+            : { kind: 'updated', equipmentId: soleAggregate.id, modality: item.modality, changedFields }
         );
         continue;
       }
@@ -228,8 +253,9 @@ export async function saveObservation(input: SaveObservationInput): Promise<Save
         lastVerifiedAt: now,
         createdAt: now,
       });
-      claims.push(claim(base, { institutionId: null, equipmentId }, 'count', item.count, item.fieldStatus.count, evidence));
-      outcomes.push({ kind: existingRows.length === 0 ? 'created' : 'created', equipmentId, modality: item.modality });
+      if (item.count != null) claims.push(claim(base, { institutionId: null, equipmentId }, 'count', item.count, item.fieldStatus.count, evidence));
+      if (item.installYearLo != null) claims.push(claim(base, { institutionId: null, equipmentId }, 'installYear', item.installYearLo, item.fieldStatus.age, evidence));
+      outcomes.push({ kind: 'created', equipmentId, modality: item.modality });
       continue;
     }
 
