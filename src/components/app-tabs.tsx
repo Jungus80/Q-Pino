@@ -37,6 +37,11 @@ export default function AppTabs() {
         <NativeTabs.Trigger.Label>Mapa</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="map.fill" />
       </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="query">
+        <NativeTabs.Trigger.Label>Consultas</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="bubble.left.and.bubble.right.fill" />
+      </NativeTabs.Trigger>
     </NativeTabs>
   );
 }
