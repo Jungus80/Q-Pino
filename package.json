@@ -9,6 +9,7 @@
     "@siteed/audio-studio": "^3.2.1",
     "d3-geo": "^3.1.1",
     "expo": "~57.0.21",
+    "expo-asset": "~57.0.16",
     "expo-build-properties": "~57.0.17",
     "expo-constants": "~57.0.17",
     "expo-device": "~57.0.1",

@@ -25,7 +25,10 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "permissions": ["RECORD_AUDIO", "CAMERA"]
+      "permissions": [
+        "RECORD_AUDIO",
+        "CAMERA"
+      ]
     },
     "web": {
       "output": "static",
@@ -44,13 +47,16 @@
       [
         "expo-build-properties",
         {
-          "android": { "minSdkVersion": 29 }
+          "android": {
+            "minSdkVersion": 29
+          }
         }
       ],
       "@qvac/sdk/expo-plugin",
       "@siteed/audio-studio",
       "expo-image-picker",
-      "expo-local-authentication"
+      "expo-local-authentication",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,
