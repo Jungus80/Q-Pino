@@ -14,7 +14,10 @@ Reglas:
 - "fieldStatus" para cada campo (manufacturer, model, age, count) usa: Confirmado (el colaborador vio una placa/etiqueta o verificó explícitamente), Reportado (lo afirma como hecho, sin cautela), Estimado (usa palabras como "parece", "unos", "aproximadamente", "creo"), o Desconocido (no se menciona).
 - Si el colaborador dice "tienen dos resonadores" sin más detalle, igual crea una entrada de equipment con modality MR y count 2 — no la omitas solo porque falte manufacturer/model.
 - "whichUnit" describe a cuál de varias unidades se refiere una afirmación parcial, por ejemplo "uno de los resonadores" o "el del segundo piso".
-- Antigüedad: NUNCA calcules tú el año de instalación a partir de una edad relativa — no hagas resta de "año actual menos X años", te vas a equivocar. Si el texto da una edad relativa ("8 años", "unos ocho años", "8 años de antigüedad"), usa SOLO ageYearsMin/ageYearsMax con ese número (8 y 8, o el rango si lo dan) y deja installYear en -1; el año de instalación se calcula después con código, no por ti. Usa installYear únicamente cuando el texto menciona un año calendario explícito (por ejemplo "instalado en 2018" o "es del 2018").
+- Antigüedad: usa EXACTAMENTE UNO de los dos campos, nunca ambos a la vez.
+  - Edad relativa ("8 años", "unos ocho años", "8 años de antigüedad"): ageYearsMin/ageYearsMax = 8 (ese número, entre 0 y 60), installYear = -1.
+  - Año calendario explícito ("instalado en 2018", "es del 2010", "del año 2010"): installYear = ese año (por ejemplo 2010), ageYearsMin = -1, ageYearsMax = -1. NUNCA pongas un año calendario (como 2010) en ageYearsMin/ageYearsMax — ese campo es 0-60, no un año.
+  - NUNCA calcules tú "año actual menos X años" ni "años desde 20XX" — esa resta la hace el código después, no tú.
 - Institution.evidence debe contener el fragmento exacto donde se menciona el nombre del hospital/clínica.
 - "missing" lista, en una palabra cada uno, los campos importantes que el colaborador no mencionó (por ejemplo "manufacturer", "age", "city").
 

@@ -80,7 +80,14 @@ export default function CaptureScreen() {
       setEquipment(normalized.equipment);
       setScreen('review');
     } catch (e: any) {
-      setError(e?.message ?? String(e));
+      console.error('[extract] failed:', e);
+      // ZodError (or anything else structurally unexpected) shouldn't dump raw internals
+      // on screen — a friendly retry prompt is more useful than a JSON issue array.
+      const friendly =
+        e?.name === 'ZodError'
+          ? 'No se pudo interpretar la respuesta del modelo. Intenta de nuevo o reformula el texto.'
+          : (e?.message ?? String(e));
+      setError(friendly);
       setScreen('input');
     }
   }

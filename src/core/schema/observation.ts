@@ -29,11 +29,15 @@ export const modalitySchema = z.enum(MODALITIES);
 // once parsed, so nothing downstream (normalization, DB, UI) needs to know it existed.
 const sentinelString = () => z.string().transform((v) => (v.trim().length === 0 ? null : v));
 
+// Out-of-range values are treated the same as the -1 sentinel (null) rather than
+// rejected: a small model occasionally confuses which field a number belongs in (e.g.
+// putting a calendar year like 2010 into ageYearsMin, which only accepts 0-60). Silently
+// discarding one bad field into "Desconocido" is far safer than throwing away the entire
+// extraction over it — a hard validation error here previously surfaced as a raw crash
+// dump instead of a usable (if partial) result.
 const sentinelNumber = (min: number, max: number, integer = false) => {
   const base = integer ? z.number().int() : z.number();
-  return base
-    .refine((v) => v === -1 || (v >= min && v <= max), { message: `must be -1 (unknown) or between ${min} and ${max}` })
-    .transform((v) => (v === -1 ? null : v));
+  return base.transform((v) => (v === -1 || v < min || v > max ? null : v));
 };
 
 /** One piece of equipment as extracted from a single observation, before normalization. */

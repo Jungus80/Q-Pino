@@ -51,7 +51,14 @@ describe('extractedObservationSchema — sentinel handling', () => {
     expect(result.equipment[0].installYear).toBe(2018);
   });
 
-  it('rejects an out-of-range value that is not the -1 sentinel', () => {
-    expect(() => extractedObservationSchema.parse(rawObservation([rawEquipment({ installYear: 500 })]))).toThrow();
+  it('clamps an out-of-range value to null instead of throwing (never crash the whole extraction over one bad field)', () => {
+    const result = extractedObservationSchema.parse(rawObservation([rawEquipment({ installYear: 500 })]));
+    expect(result.equipment[0].installYear).toBeNull();
+  });
+
+  it('regression: a calendar year mistakenly put in ageYearsMin (only 0-60 valid) becomes null, not a crash', () => {
+    const result = extractedObservationSchema.parse(rawObservation([rawEquipment({ ageYearsMin: 2010, ageYearsMax: 2010 })]));
+    expect(result.equipment[0].ageYearsMin).toBeNull();
+    expect(result.equipment[0].ageYearsMax).toBeNull();
   });
 });
