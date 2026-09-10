@@ -4,8 +4,21 @@
 // mirror of src/core/schema/observation.ts but in raw JSON Schema form (not zod), since
 // that's what the QVAC completion API expects on the wire.
 //
-// Kept `additionalProperties: false` and every field `required` explicitly: QVAC's
-// `strict` flag does NOT auto-tighten the schema the way OpenAI's does.
+// Two llama.cpp grammar-engine quirks shaped this file (found via the phase-0 device
+// spike, see git history):
+//  1. `type: [X, 'null']` (nullable unions) hits known bugs in json-schema-to-grammar.cpp
+//     (empty required+optional short-circuit, minLength/maxLength clamping). We never use
+//     that pattern here — a field that may be unknown is simply omitted from `required`
+//     instead of made nullable. src/core/schema/observation.ts fills in `null` for any
+//     field the model leaves out.
+//  2. Structural fields (the ones that give the payload its shape: `modality`,
+//     `fieldStatus`, `evidence`, ...) stay in `required` so the model can't omit the
+//     skeleton — only genuinely-optional *values* are left out of `required`.
+//
+// Also load the model with `modelConfig: { reasoning_budget: 0 }` — Qwen3.5 thinks by
+// default, and its reasoning-channel tokens aren't part of this grammar's root, which
+// crashes the grammar sampler ("Unexpected empty grammar stack") the moment it tries to
+// emit one.
 
 import { MODALITIES } from './observation';
 
@@ -14,30 +27,18 @@ const FIELD_STATUS_ENUM = ['Confirmado', 'Reportado', 'Estimado', 'Desconocido']
 const equipmentItemSchema = {
   type: 'object',
   additionalProperties: false,
-  required: [
-    'modality',
-    'count',
-    'manufacturer',
-    'model',
-    'ageYearsMin',
-    'ageYearsMax',
-    'installYear',
-    'serial',
-    'whichUnit',
-    'fieldStatus',
-    'evidence',
-  ],
+  required: ['modality', 'fieldStatus', 'evidence'],
   properties: {
     modality: { type: 'string', enum: [...MODALITIES] },
-    count: { type: ['integer', 'null'] },
-    manufacturer: { type: ['string', 'null'] },
-    model: { type: ['string', 'null'] },
-    ageYearsMin: { type: ['number', 'null'] },
-    ageYearsMax: { type: ['number', 'null'] },
-    installYear: { type: ['integer', 'null'] },
-    serial: { type: ['string', 'null'] },
+    count: { type: 'integer' },
+    manufacturer: { type: 'string' },
+    model: { type: 'string' },
+    ageYearsMin: { type: 'number' },
+    ageYearsMax: { type: 'number' },
+    installYear: { type: 'integer' },
+    serial: { type: 'string' },
     whichUnit: {
-      type: ['string', 'null'],
+      type: 'string',
       description: 'Which unit(s) this claim refers to, e.g. "one of the MR systems".',
     },
     fieldStatus: {
@@ -64,22 +65,22 @@ export const OBSERVATION_EXTRACTION_SCHEMA = {
   schema: {
     type: 'object',
     additionalProperties: false,
-    required: ['institution', 'equipment', 'comments', 'missing'],
+    required: ['institution', 'equipment', 'missing'],
     properties: {
       institution: {
         type: 'object',
         additionalProperties: false,
-        required: ['name', 'site', 'city', 'country', 'evidence'],
+        required: ['evidence'],
         properties: {
-          name: { type: ['string', 'null'] },
-          site: { type: ['string', 'null'], description: 'Building, floor, or department, if mentioned.' },
-          city: { type: ['string', 'null'] },
-          country: { type: ['string', 'null'] },
+          name: { type: 'string' },
+          site: { type: 'string', description: 'Building, floor, or department, if mentioned.' },
+          city: { type: 'string' },
+          country: { type: 'string' },
           evidence: { type: 'array', items: { type: 'string' } },
         },
       },
       equipment: { type: 'array', items: equipmentItemSchema },
-      comments: { type: ['string', 'null'] },
+      comments: { type: 'string' },
       missing: {
         type: 'array',
         items: { type: 'string' },
@@ -97,33 +98,20 @@ export const QUERY_DSL_SCHEMA = {
   schema: {
     type: 'object',
     additionalProperties: false,
-    required: [
-      'region',
-      'country',
-      'city',
-      'modality',
-      'manufacturer',
-      'minAge',
-      'maxAge',
-      'minConfidence',
-      'incomplete',
-      'stale',
-      'groupBy',
-      'metric',
-    ],
+    required: ['region', 'country', 'city', 'modality', 'manufacturer'],
     properties: {
       region: { type: 'array', items: { type: 'string' } },
       country: { type: 'array', items: { type: 'string' }, description: 'ISO-3166 alpha-2 codes.' },
       city: { type: 'array', items: { type: 'string' } },
       modality: { type: 'array', items: { type: 'string', enum: [...MODALITIES] } },
       manufacturer: { type: 'array', items: { type: 'string' } },
-      minAge: { type: ['number', 'null'] },
-      maxAge: { type: ['number', 'null'] },
-      minConfidence: { type: ['number', 'null'] },
-      incomplete: { type: ['boolean', 'null'] },
-      stale: { type: ['boolean', 'null'] },
-      groupBy: { type: ['string', 'null'], enum: ['country', 'city', 'modality', 'manufacturer', null] },
-      metric: { type: ['string', 'null'], enum: ['count', 'avgAge', 'confidence', null] },
+      minAge: { type: 'number' },
+      maxAge: { type: 'number' },
+      minConfidence: { type: 'number' },
+      incomplete: { type: 'boolean' },
+      stale: { type: 'boolean' },
+      groupBy: { type: 'string', enum: ['country', 'city', 'modality', 'manufacturer'] },
+      metric: { type: 'string', enum: ['count', 'avgAge', 'confidence'] },
     },
   },
 } as const;

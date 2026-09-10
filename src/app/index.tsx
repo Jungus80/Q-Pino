@@ -63,7 +63,15 @@ export default function SpikeScreen() {
         llmId = await loadModel({
           modelSrc: QWEN3_5_2B_MULTIMODAL_Q4_K_M,
           modelType: 'llm',
-          modelConfig: { device: 'gpu', ctx_size: 4096, verbosity: VERBOSITY.ERROR },
+          modelConfig: {
+            device: 'gpu',
+            ctx_size: 4096,
+            verbosity: VERBOSITY.ERROR,
+            // Qwen3.5 thinks by default; its reasoning-channel tokens aren't part of
+            // our JSON-root grammar and crash the grammar sampler ("Unexpected empty
+            // grammar stack") the moment it tries to emit one. 0 disables reasoning.
+            reasoning_budget: 0,
+          },
           onProgress: (p) => patch('json', 'running', `loading… ${Math.round(p.percentage)}%`),
         });
 
@@ -105,7 +113,9 @@ export default function SpikeScreen() {
           onProgress: (p) => patch('asr', 'running', `loading… ${Math.round(p.percentage)}%`),
         });
 
-        const asset = Asset.fromModule(require('@/assets/audio/spike-sample-es.wav'));
+        // Metro resolves the tsconfig `@/` alias for JS modules, but not reliably for
+        // asset requires — use a relative path for the bundled WAV.
+        const asset = Asset.fromModule(require('../assets/audio/spike-sample-es.wav'));
         await asset.downloadAsync();
         const filePath = (asset.localUri ?? asset.uri).replace(/^file:\/\//, '');
         const text = await transcribe({ modelId: asrId, audioChunk: filePath });

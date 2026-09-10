@@ -21,17 +21,24 @@ export type FieldStatus = (typeof FIELD_STATUSES)[number];
 export const fieldStatusSchema = z.enum(FIELD_STATUSES);
 export const modalitySchema = z.enum(MODALITIES);
 
+// QVAC's json_schema grammar leaves genuinely-optional fields out of `required` instead
+// of using a `[X, 'null']` nullable union (see src/core/schema/jsonSchemas.ts for why) —
+// so the model may omit these keys entirely. `.nullable().default(null)` accepts both an
+// omitted key and an explicit `null`, normalizing either to `null` without widening the
+// inferred TS type to include `undefined`.
+const optionalString = () => z.string().nullable().default(null);
+
 /** One piece of equipment as extracted from a single observation, before normalization. */
 export const extractedEquipmentSchema = z.object({
   modality: modalitySchema,
-  count: z.number().int().min(0).max(200).nullable(),
-  manufacturer: z.string().nullable(),
-  model: z.string().nullable(),
-  ageYearsMin: z.number().min(0).max(60).nullable(),
-  ageYearsMax: z.number().min(0).max(60).nullable(),
-  installYear: z.number().int().min(1970).max(2100).nullable(),
-  serial: z.string().nullable(),
-  whichUnit: z.string().nullable(),
+  count: z.number().int().min(0).max(200).nullable().default(null),
+  manufacturer: optionalString(),
+  model: optionalString(),
+  ageYearsMin: z.number().min(0).max(60).nullable().default(null),
+  ageYearsMax: z.number().min(0).max(60).nullable().default(null),
+  installYear: z.number().int().min(1970).max(2100).nullable().default(null),
+  serial: optionalString(),
+  whichUnit: optionalString(),
   fieldStatus: z.object({
     manufacturer: fieldStatusSchema,
     model: fieldStatusSchema,
@@ -45,14 +52,14 @@ export type ExtractedEquipment = z.infer<typeof extractedEquipmentSchema>;
 /** The full structured payload the LLM must produce for one observation. */
 export const extractedObservationSchema = z.object({
   institution: z.object({
-    name: z.string().nullable(),
-    site: z.string().nullable(),
-    city: z.string().nullable(),
-    country: z.string().nullable(),
+    name: optionalString(),
+    site: optionalString(),
+    city: optionalString(),
+    country: optionalString(),
     evidence: z.array(z.string()),
   }),
   equipment: z.array(extractedEquipmentSchema),
-  comments: z.string().nullable(),
+  comments: optionalString(),
   missing: z.array(z.string()),
 });
 export type ExtractedObservation = z.infer<typeof extractedObservationSchema>;
