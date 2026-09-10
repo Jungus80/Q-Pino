@@ -72,6 +72,11 @@ export function useVoiceCapture() {
       const modelId = await loadExclusive({
         modelSrc: PARAKEET_TDT_0_6B_V3_Q4_0,
         modelType: 'parakeet-transcription',
+        // Parakeet's streaming duplex mode is configured at LOAD time, not per-call —
+        // opening a transcribeStream() session against a model loaded without this
+        // almost certainly explains the native error every audio-format attempt hit
+        // identically: the session itself was never viable, regardless of the audio.
+        modelConfig: { streaming: true, streamingEmitPartials: true },
       });
       setIsLoadingModel(false);
 
