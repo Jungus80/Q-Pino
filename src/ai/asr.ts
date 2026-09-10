@@ -1,5 +1,5 @@
 import { transcribeStream, PARAKEET_TDT_0_6B_V3_Q4_0, type TranscribeStreamSession } from '@qvac/sdk';
-import { useAudioRecorder } from '@siteed/audio-studio';
+import { AudioStudioModule, useAudioRecorder } from '@siteed/audio-studio';
 import { toByteArray } from 'base64-js';
 import { useCallback, useRef, useState } from 'react';
 import { loadExclusive, unloadCurrentModel } from './modelManager';
@@ -52,6 +52,17 @@ export function useVoiceCapture() {
     textRef.current = '';
     setIsLoadingModel(true);
     try {
+      // startRecording() never requests mic permission itself — on iOS this makes it
+      // fail with an unlocalized native error ("undefined reason") instead of ever
+      // showing the system prompt, because the permission status starts as
+      // "undetermined" and the native code doesn't request-and-await it first.
+      const permission = await AudioStudioModule.requestPermissionsAsync();
+      if (!permission.granted) {
+        throw new Error(
+          'Sin permiso de micrófono. Actívalo en Ajustes > QVAC > Micrófono y vuelve a intentar.'
+        );
+      }
+
       const modelId = await loadExclusive({
         modelSrc: PARAKEET_TDT_0_6B_V3_Q4_0,
         modelType: 'parakeet-transcription',
