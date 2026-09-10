@@ -1,6 +1,6 @@
 import { completion, QWEN3_5_2B_MULTIMODAL_Q4_K_M } from '@qvac/sdk';
 import { QUERY_DSL_SCHEMA } from '../core/schema/jsonSchemas';
-import { queryDslSchema, type QueryDsl } from '../core/query/dsl';
+import { queryDslSchema, sanitizeQueryDsl, type QueryDsl } from '../core/query/dsl';
 import { findCountry, findCity } from '../core/normalize/geo';
 import { QUERY_SYSTEM_PROMPT } from './prompts/query';
 import { withModel, type OnProgress } from './modelManager';
@@ -43,7 +43,7 @@ export async function parseNaturalLanguageQuery(question: string, onProgress?: O
         .filter((iso, i, arr) => arr.indexOf(iso) === i);
       const city = raw.city.map((c) => findCity(c)?.name ?? c);
 
-      return queryDslSchema.parse({ ...raw, country, city });
+      return sanitizeQueryDsl(queryDslSchema.parse({ ...raw, country, city }));
     }
   );
 }

@@ -99,66 +99,68 @@ export default function ClientDetailScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 bg-neutral-950 items-center justify-center">
-        <ActivityIndicator color="#fff" />
+      <SafeAreaView className="flex-1 bg-white items-center justify-center">
+        <ActivityIndicator color="#0066CC" size="large" />
       </SafeAreaView>
     );
   }
 
   if (!institution) {
     return (
-      <SafeAreaView className="flex-1 bg-neutral-950 items-center justify-center">
-        <Text className="text-neutral-400">Cliente no encontrado.</Text>
+      <SafeAreaView className="flex-1 bg-white items-center justify-center">
+        <Text className="text-gray-600">Cliente no encontrado.</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-neutral-950">
+    <SafeAreaView className="flex-1 bg-white">
       <ScrollView contentContainerClassName="p-4 pb-12">
-        <Text className="text-white text-2xl font-bold">{institution.name}</Text>
-        <Text className="text-neutral-400 mb-1">
+        <Text className="text-gray-900 text-2xl font-bold">{institution.name}</Text>
+        <Text className="text-gray-600 text-sm mt-1 mb-1">
           {[institution.site, institution.city, institution.countryIso].filter(Boolean).join(' · ') || 'Ubicación desconocida'}
         </Text>
-        <Text className="text-neutral-600 text-xs mb-5">
+        <Text className="text-gray-500 text-xs mb-6">
           Cliente desde {new Date(institution.createdAt).toLocaleDateString('es')}
         </Text>
 
         {groups.length === 0 && (
-          <Text className="text-neutral-500">Todavía no hay equipos registrados para este cliente.</Text>
+          <View className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+            <Text className="text-gray-600">Todavía no hay equipos registrados para este cliente.</Text>
+          </View>
         )}
 
         {groups.map((g) => (
-          <View key={g.modality} className="bg-neutral-900 rounded-xl p-4 mb-3">
-            <View className="flex-row items-center justify-between mb-2">
-              <Text className="text-white font-semibold text-base">{g.modality}</Text>
-              <View className={`px-2 py-0.5 rounded-full ${BAND_COLOR[g.band]}`}>
-                <Text className="text-white text-xs font-medium">
-                  Confianza {g.band} ({g.score})
+          <View key={g.modality} className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
+            <View className="flex-row items-center justify-between mb-4">
+              <Text className="text-gray-900 font-bold text-base">{g.modality}</Text>
+              <View className={`px-3 py-1 rounded-full ${BAND_COLOR[g.band]}`}>
+                <Text className="text-white text-xs font-bold">
+                  {g.band} ({g.score})
                 </Text>
               </View>
             </View>
-            <View className="flex-row justify-between">
+            <View className="flex-row justify-between mb-4 pb-4 border-b border-gray-200">
               <View>
-                <Text className="text-neutral-500 text-xs">Cantidad</Text>
-                <Text className="text-white text-lg font-semibold">{g.count}</Text>
+                <Text className="text-gray-600 text-xs font-semibold mb-1">Cantidad</Text>
+                <Text className="text-gray-900 text-2xl font-bold">{g.count}</Text>
               </View>
               <View>
-                <Text className="text-neutral-500 text-xs">Antigüedad aprox.</Text>
-                <Text className="text-white text-lg font-semibold">{g.ageLabel}</Text>
+                <Text className="text-gray-600 text-xs font-semibold mb-1">Antigüedad Aprox.</Text>
+                <Text className="text-gray-900 text-2xl font-bold">{g.ageLabel}</Text>
               </View>
             </View>
-            <View className="mt-3 border-t border-neutral-800 pt-1">
+            <View>
               {g.items.map((item) => (
                 <Pressable
                   key={item.id}
                   onPress={() => router.push(`/equipment/${item.id}`)}
-                  className="flex-row items-center justify-between py-1.5">
-                  <Text className="text-neutral-400 text-xs flex-1">
+                  className="flex-row items-center justify-between py-2.5 border-b border-gray-100 last:border-b-0">
+                  <Text className="text-gray-700 text-sm flex-1">
                     {[item.manufacturer, item.model].filter(Boolean).join(' ') || 'Fabricante/modelo desconocido'}
                     {item.count != null ? ` · ${item.count} unidad(es)` : ''}
                   </Text>
-                  <Text className="text-neutral-600 text-xs">›</Text>
+                  <Text className="text-gray-400 text-lg">›</Text>
                 </Pressable>
               ))}
             </View>
@@ -167,13 +169,13 @@ export default function ClientDetailScreen() {
 
         {comments.length > 0 && (
           <>
-            <Text className="text-neutral-500 text-xs uppercase mb-2 mt-2">
+            <Text className="text-gray-700 text-sm font-bold uppercase mb-3 mt-6">
               Comentarios ({comments.length})
             </Text>
             {comments.map((o) => (
-              <View key={o.id} className="bg-neutral-900 rounded-lg p-3 mb-2">
-                <Text className="text-neutral-300 text-sm mb-1">{o.comments}</Text>
-                <Text className="text-neutral-600 text-xs">
+              <View key={o.id} className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-2">
+                <Text className="text-gray-900 text-sm mb-2">{o.comments}</Text>
+                <Text className="text-gray-600 text-xs">
                   {new Date(o.createdAt).toLocaleDateString('es', { year: 'numeric', month: 'short', day: 'numeric' })}
                   {' · '}
                   {o.observerId} · {SOURCE_LABEL[o.source] ?? o.source}

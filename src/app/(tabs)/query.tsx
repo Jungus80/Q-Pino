@@ -72,84 +72,99 @@ export default function QueryScreen() {
     : [];
 
   return (
-    <SafeAreaView className="flex-1 bg-neutral-950">
+    <SafeAreaView className="flex-1 bg-white">
       <ScrollView contentContainerClassName="p-4 pb-12" keyboardShouldPersistTaps="handled">
-        <Text className="text-white text-2xl font-bold mb-1">Consultas</Text>
-        <Text className="text-neutral-400 mb-4">Pregunta sobre el parque instalado en lenguaje natural.</Text>
+        <Text className="text-gray-900 text-2xl font-bold mb-1">Consultas</Text>
+        <Text className="text-gray-500 text-sm mb-4">Pregunta sobre el parque instalado en lenguaje natural.</Text>
 
-        <View className="bg-neutral-900 rounded-xl p-3 mb-3">
+        <View className="bg-white border-2 border-gray-200 rounded-xl p-4 mb-4">
+          <Text className="text-gray-700 text-sm font-semibold mb-3">Tu pregunta</Text>
           <TextInput
             value={question}
             onChangeText={setQuestion}
             placeholder="Ej: clientes en Brasil con resonadores de más de 7 años"
-            placeholderTextColor="#71717a"
-            className="text-white text-base mb-3"
+            placeholderTextColor="#9CA3AF"
+            className="text-gray-900 text-base mb-4 border border-gray-200 rounded-lg p-3"
             multiline
           />
           <Pressable
             onPress={handleAsk}
             disabled={loading || !question.trim()}
-            className={`rounded-lg py-2.5 items-center ${loading || !question.trim() ? 'bg-neutral-800' : 'bg-blue-600'}`}>
-            <Text className="text-white font-semibold">
-              {loading ? (progress !== null ? `Cargando modelo… ${progress}%` : 'Pensando…') : 'Preguntar'}
+            className={`rounded-lg py-3 items-center ${loading || !question.trim() ? 'bg-gray-300' : 'bg-blue-600'}`}>
+            <Text className={`font-semibold ${loading || !question.trim() ? 'text-gray-500' : 'text-white'}`}>
+              {loading ? (progress !== null ? `Cargando… ${progress}%` : 'Pensando…') : '🔍 Preguntar'}
             </Text>
           </Pressable>
         </View>
 
         {!dsl && !loading && (
-          <View className="mb-4">
-            <Text className="text-neutral-500 text-xs uppercase mb-2">Ejemplos</Text>
+          <View className="mb-6">
+            <Text className="text-gray-700 text-sm font-bold uppercase mb-3">Ejemplos</Text>
             {EXAMPLES.map((ex) => (
-              <Pressable key={ex} onPress={() => setQuestion(ex)} className="py-1.5">
-                <Text className="text-blue-400 text-sm">{ex}</Text>
+              <Pressable key={ex} onPress={() => setQuestion(ex)} className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-2">
+                <Text className="text-blue-700 text-sm font-medium">{ex}</Text>
               </Pressable>
             ))}
           </View>
         )}
 
-        {error && <Text className="text-red-400 text-sm mb-4">{error}</Text>}
+        {error && (
+          <View className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+            <Text className="text-red-700 text-sm font-medium">{error}</Text>
+          </View>
+        )}
 
         {dsl && (
           <>
-            <Text className="text-neutral-500 text-xs uppercase mb-2">Filtro interpretado (toca × para quitar)</Text>
-            <View className="flex-row flex-wrap gap-2 mb-5">
+            <Text className="text-gray-700 text-sm font-bold uppercase mb-3">Filtro Interpretado</Text>
+            <View className="flex-row flex-wrap gap-2 mb-6">
               {chipLabels
                 .filter(([, label]) => label !== '')
                 .map(([key, label]) => (
-                  <Pressable key={key} onPress={() => clearFilter(key)} className="bg-blue-600 rounded-full px-3 py-1">
-                    <Text className="text-white text-xs">{label} ×</Text>
+                  <Pressable key={key} onPress={() => clearFilter(key)} className="bg-blue-100 rounded-full px-3 py-1.5">
+                    <Text className="text-blue-700 text-xs font-semibold">{label} ×</Text>
                   </Pressable>
                 ))}
             </View>
 
             {groups ? (
-              <View className="mb-5">
-                <Text className="text-neutral-500 text-xs uppercase mb-2">Resultado ({groups.length} grupos)</Text>
+              <View className="mb-6">
+                <Text className="text-gray-700 text-sm font-bold uppercase mb-3">Resultado ({groups.length} grupos)</Text>
                 {groups.map((g) => (
-                  <View key={g.key} className="bg-neutral-900 rounded-lg p-3 mb-1.5 flex-row justify-between">
-                    <Text className="text-white text-sm">{g.key}</Text>
-                    <Text className="text-blue-400 text-sm font-semibold">{g.value}</Text>
+                  <View key={g.key} className="bg-white border border-gray-200 rounded-lg p-3 mb-2 flex-row justify-between items-center">
+                    <Text className="text-gray-900 text-sm font-semibold">{g.key}</Text>
+                    <View className="bg-blue-100 rounded-lg px-2.5 py-1">
+                      <Text className="text-blue-700 text-sm font-bold">{g.value}</Text>
+                    </View>
                   </View>
                 ))}
-                {groups.length === 0 && <Text className="text-neutral-600 text-sm">Sin resultados.</Text>}
+                {groups.length === 0 && (
+                  <View className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                    <Text className="text-gray-600 text-sm">Sin resultados.</Text>
+                  </View>
+                )}
               </View>
             ) : (
-              <View className="mb-5">
-                <Text className="text-neutral-500 text-xs uppercase mb-2">
+              <View className="mb-6">
+                <Text className="text-gray-700 text-sm font-bold uppercase mb-3">
                   {rows.length} equipo(s) en {new Set(rows.map((r) => r.institutionId)).size} cliente(s)
                 </Text>
                 {Array.from(new Map(rows.map((r) => [r.institutionId, r])).values()).map((r) => (
                   <Pressable
                     key={r.institutionId}
                     onPress={() => router.push(`/clients/${r.institutionId}`)}
-                    className="bg-neutral-900 rounded-lg p-3 mb-1.5">
-                    <Text className="text-white text-sm">{r.institutionName}</Text>
-                    <Text className="text-neutral-500 text-xs">
+                    className="bg-white border border-gray-200 rounded-lg p-3 mb-2">
+                    <Text className="text-gray-900 text-sm font-semibold">{r.institutionName}</Text>
+                    <Text className="text-gray-600 text-xs mt-1">
                       {r.city ?? '—'}, {r.countryIso ?? '—'}
                     </Text>
                   </Pressable>
                 ))}
-                {rows.length === 0 && <Text className="text-neutral-600 text-sm">Sin resultados.</Text>}
+                {rows.length === 0 && (
+                  <View className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                    <Text className="text-gray-600 text-sm">Sin resultados.</Text>
+                  </View>
+                )}
               </View>
             )}
           </>

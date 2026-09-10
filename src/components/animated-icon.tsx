@@ -1,12 +1,12 @@
 import { Image } from 'expo-image';
 import * as SplashScreen from 'expo-splash-screen';
 import { useState } from 'react';
-import { Dimensions, StyleSheet, View } from 'react-native';
+import { Dimensions, StyleSheet, View, Text } from 'react-native';
 import Animated, { Easing, Keyframe } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
 const INITIAL_SCALE_FACTOR = Dimensions.get('screen').height / 90;
-const DURATION = 600;
+const DURATION = 400;
 
 export function AnimatedSplashOverlay() {
   const [animate, setAnimate] = useState(false);
@@ -44,7 +44,11 @@ export function AnimatedSplashOverlay() {
         }
       })}
       style={styles.splashOverlay}>
-      {image}
+      <View style={styles.content}>
+        {image}
+        <Text style={styles.title}>QVAC</Text>
+        <Text style={styles.subtitle}>Vigilancia Médica</Text>
+      </View>
     </Animated.View>
   ) : (
     <View
@@ -54,7 +58,11 @@ export function AnimatedSplashOverlay() {
         });
       }}
       style={styles.splashOverlay}>
-      {image}
+      <View style={styles.content}>
+        {image}
+        <Text style={styles.title}>QVAC</Text>
+        <Text style={styles.subtitle}>Vigilancia Médica</Text>
+      </View>
     </View>
   );
 }
@@ -128,8 +136,9 @@ const styles = StyleSheet.create({
     zIndex: 100,
   },
   image: {
-    width: 76,
-    height: 71,
+    width: 96,
+    height: 90,
+    marginBottom: 24,
   },
   background: {
     borderRadius: 40,
@@ -140,9 +149,26 @@ const styles = StyleSheet.create({
   },
   splashOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: '#208AEF',
+    backgroundColor: '#0066CC',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
+  },
+  content: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 8,
+    letterSpacing: 1,
+  },
+  subtitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#E0F2FE',
+    letterSpacing: 0.5,
   },
 });

@@ -9,8 +9,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <View className="mb-5">
-      <Text className="text-neutral-500 text-xs uppercase mb-2">{title}</Text>
+    <View className="mb-6">
+      <Text className="text-gray-700 text-sm font-bold uppercase mb-3">{title}</Text>
       {children}
     </View>
   );
@@ -31,13 +31,13 @@ function Bar({
 }) {
   const pct = max === 0 ? 0 : Math.max(4, (count / max) * 100);
   return (
-    <Pressable onPress={onPress} className="mb-2" disabled={count === 0}>
-      <View className="flex-row justify-between mb-1">
-        <Text className={`text-sm ${active ? 'text-blue-400 font-semibold' : 'text-neutral-300'}`}>{label}</Text>
-        <Text className={`text-sm font-medium ${active ? 'text-blue-400' : 'text-white'}`}>{count}</Text>
+    <Pressable onPress={onPress} className="mb-3" disabled={count === 0}>
+      <View className="flex-row justify-between mb-2">
+        <Text className={`text-sm font-semibold ${active ? 'text-blue-600' : 'text-gray-700'}`}>{label}</Text>
+        <Text className={`text-sm font-bold ${active ? 'text-blue-600' : 'text-gray-900'}`}>{count}</Text>
       </View>
-      <View className="h-2 bg-neutral-800 rounded-full overflow-hidden">
-        <View className={`h-full rounded-full ${active ? 'bg-blue-400' : 'bg-blue-600'}`} style={{ width: `${pct}%` }} />
+      <View className="h-2.5 bg-gray-200 rounded-full overflow-hidden">
+        <View className={`h-full rounded-full ${active ? 'bg-blue-600' : 'bg-blue-500'}`} style={{ width: `${pct}%` }} />
       </View>
     </Pressable>
   );
@@ -100,8 +100,8 @@ export default function DashboardScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 bg-neutral-950 items-center justify-center">
-        <ActivityIndicator color="#fff" />
+      <SafeAreaView className="flex-1 bg-white items-center justify-center">
+        <ActivityIndicator color="#0066CC" size="large" />
       </SafeAreaView>
     );
   }
@@ -118,48 +118,50 @@ export default function DashboardScreen() {
   const hasActiveFilters = filters.modality || filters.countryIso || filters.ageBucket;
 
   return (
-    <SafeAreaView className="flex-1 bg-neutral-950">
+    <SafeAreaView className="flex-1 bg-white">
       <ScrollView contentContainerClassName="p-4 pb-12">
-        <View className="flex-row items-center justify-between mb-1">
-          <Text className="text-white text-2xl font-bold">Dashboard</Text>
+        <View className="flex-row items-center justify-between mb-2">
+          <View>
+            <Text className="text-gray-900 text-2xl font-bold">Dashboard</Text>
+            <Text className="text-gray-500 text-sm mt-1">{data.totalEquipment} equipos{hasActiveFilters ? ' (filtrado)' : ' en total'}</Text>
+          </View>
           {hasActiveFilters && (
-            <Pressable onPress={() => setFilters(EMPTY_FILTERS)}>
-              <Text className="text-red-400 text-xs">Limpiar filtros</Text>
+            <Pressable onPress={() => setFilters(EMPTY_FILTERS)} className="bg-red-50 rounded-lg px-3 py-2">
+              <Text className="text-red-600 text-xs font-semibold">Limpiar</Text>
             </Pressable>
           )}
         </View>
-        <Text className="text-neutral-400 mb-2">{data.totalEquipment} equipos{hasActiveFilters ? ' (filtrado)' : ' en total'}</Text>
 
         {hasActiveFilters && (
-          <View className="flex-row flex-wrap gap-2 mb-3">
+          <View className="flex-row flex-wrap gap-2 mb-4">
             {filters.modality && (
-              <Pressable onPress={() => toggle('modality', filters.modality)} className="bg-blue-600 rounded-full px-3 py-1">
-                <Text className="text-white text-xs">{filters.modality} ×</Text>
+              <Pressable onPress={() => toggle('modality', filters.modality)} className="bg-blue-100 rounded-full px-3 py-1.5">
+                <Text className="text-blue-700 text-xs font-semibold">{filters.modality} ×</Text>
               </Pressable>
             )}
             {filters.countryIso && (
-              <Pressable onPress={() => toggle('countryIso', filters.countryIso)} className="bg-blue-600 rounded-full px-3 py-1">
-                <Text className="text-white text-xs">{filters.countryIso} ×</Text>
+              <Pressable onPress={() => toggle('countryIso', filters.countryIso)} className="bg-blue-100 rounded-full px-3 py-1.5">
+                <Text className="text-blue-700 text-xs font-semibold">{filters.countryIso} ×</Text>
               </Pressable>
             )}
             {filters.ageBucket && (
-              <Pressable onPress={() => toggle('ageBucket', filters.ageBucket)} className="bg-blue-600 rounded-full px-3 py-1">
-                <Text className="text-white text-xs">{filters.ageBucket} ×</Text>
+              <Pressable onPress={() => toggle('ageBucket', filters.ageBucket)} className="bg-blue-100 rounded-full px-3 py-1.5">
+                <Text className="text-blue-700 text-xs font-semibold">{filters.ageBucket} ×</Text>
               </Pressable>
             )}
           </View>
         )}
 
-        <View className="flex-row gap-3 mb-5">
-          <View className="flex-1 bg-neutral-900 rounded-xl p-3">
-            <Text className="text-neutral-500 text-xs">Confianza promedio</Text>
-            <Text className={`text-2xl font-bold ${confidenceColor}`}>{data.avgConfidence}</Text>
-            <Text className="text-neutral-500 text-xs">{confidenceBand}</Text>
+        <View className="flex-row gap-3 mb-6">
+          <View className="flex-1 bg-blue-50 rounded-xl p-4 border border-blue-200">
+            <Text className="text-blue-700 text-xs font-semibold mb-2">Confianza Promedio</Text>
+            <Text className={`text-3xl font-bold ${confidenceColor}`}>{data.avgConfidence}</Text>
+            <Text className="text-blue-600 text-xs mt-1">{confidenceBand}</Text>
           </View>
-          <View className="flex-1 bg-neutral-900 rounded-xl p-3">
-            <Text className="text-neutral-500 text-xs">Sin actualizar +1 año</Text>
-            <Text className="text-2xl font-bold text-white">{data.staleClients.length}</Text>
-            <Text className="text-neutral-500 text-xs">clientes</Text>
+          <View className="flex-1 bg-amber-50 rounded-xl p-4 border border-amber-200">
+            <Text className="text-amber-700 text-xs font-semibold mb-2">Sin Actualizar +1 Año</Text>
+            <Text className="text-3xl font-bold text-amber-600">{data.staleClients.length}</Text>
+            <Text className="text-amber-600 text-xs mt-1">clientes</Text>
           </View>
         </View>
 
@@ -203,66 +205,78 @@ export default function DashboardScreen() {
           ))}
         </Section>
 
-        <Section title={`Oportunidades de renovación (${data.renewalOpportunities.length})`}>
+        <Section title={`Oportunidades de Renovación (${data.renewalOpportunities.length})`}>
           {data.renewalOpportunities.length === 0 && (
-            <Text className="text-neutral-600 text-sm">Ningún equipo supera el umbral de renovación de su modalidad.</Text>
+            <View className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+              <Text className="text-gray-600 text-sm">Ningún equipo supera el umbral de renovación.</Text>
+            </View>
           )}
           {data.renewalOpportunities.map((r, i) => (
             <Pressable
               key={i}
               onPress={() => router.push(`/clients/${r.institutionId}`)}
-              className="bg-neutral-900 rounded-lg p-3 mb-2 flex-row items-center justify-between">
+              className="bg-white border border-gray-200 rounded-lg p-3 mb-2 flex-row items-center justify-between">
               <View className="flex-1">
-                <Text className="text-white text-sm font-medium">{r.institutionName}</Text>
-                <Text className="text-neutral-500 text-xs">
+                <Text className="text-gray-900 text-sm font-semibold">{r.institutionName}</Text>
+                <Text className="text-gray-600 text-xs mt-1">
                   {r.modality} · ~{r.ageYears} años (umbral: {r.thresholdYears})
                 </Text>
               </View>
-              <Text className="text-amber-400 text-xs font-medium">Confianza {r.confidence}</Text>
+              <View className="bg-amber-100 rounded-lg px-2 py-1">
+                <Text className="text-amber-700 text-xs font-bold">{r.confidence}</Text>
+              </View>
             </Pressable>
           ))}
         </Section>
 
-        <Section title={`Clientes con tecnología envejecida (${data.agingClients.length})`}>
-          {data.agingClients.length === 0 && <Text className="text-neutral-600 text-sm">Ninguno.</Text>}
+        <Section title={`Clientes con Tecnología Envejecida (${data.agingClients.length})`}>
+          {data.agingClients.length === 0 && (
+            <View className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+              <Text className="text-gray-600 text-sm">Ninguno.</Text>
+            </View>
+          )}
           {data.agingClients.slice(0, 8).map((c, i) => (
-            <Pressable key={i} onPress={() => router.push(`/clients/${c.institutionId}`)} className="py-1.5">
-              <Text className="text-neutral-300 text-sm">
-                {c.institutionName} — {c.modality}, ~{c.ageYears} años
-              </Text>
+            <Pressable key={i} onPress={() => router.push(`/clients/${c.institutionId}`)} className="bg-white border border-gray-200 rounded-lg p-3 mb-2">
+              <Text className="text-gray-900 text-sm font-semibold">{c.institutionName}</Text>
+              <Text className="text-gray-600 text-xs mt-1">{c.modality}, ~{c.ageYears} años</Text>
             </Pressable>
           ))}
         </Section>
 
-        <Section title={`Clientes con información incompleta (${data.incompleteClients.length})`}>
-          {data.incompleteClients.length === 0 && <Text className="text-neutral-600 text-sm">Ninguno.</Text>}
+        <Section title={`Clientes con Información Incompleta (${data.incompleteClients.length})`}>
+          {data.incompleteClients.length === 0 && (
+            <View className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+              <Text className="text-gray-600 text-sm">Ninguno.</Text>
+            </View>
+          )}
           {data.incompleteClients.slice(0, 8).map((c) => (
-            <Pressable key={c.institutionId} onPress={() => router.push(`/clients/${c.institutionId}`)} className="py-1.5">
-              <Text className="text-neutral-300 text-sm">
-                {c.institutionName} — {c.incompleteCount} campo(s) sin dato
-              </Text>
+            <Pressable key={c.institutionId} onPress={() => router.push(`/clients/${c.institutionId}`)} className="bg-white border border-gray-200 rounded-lg p-3 mb-2">
+              <Text className="text-gray-900 text-sm font-semibold">{c.institutionName}</Text>
+              <Text className="text-gray-600 text-xs mt-1">{c.incompleteCount} campo(s) sin dato</Text>
             </Pressable>
           ))}
         </Section>
 
-        <Section title="Sitios actualizados recientemente">
-          {data.recentlyUpdated.length === 0 && <Text className="text-neutral-600 text-sm">Sin observaciones aún.</Text>}
+        <Section title="Sitios Actualizados Recientemente">
+          {data.recentlyUpdated.length === 0 && (
+            <View className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+              <Text className="text-gray-600 text-sm">Sin observaciones aún.</Text>
+            </View>
+          )}
           {data.recentlyUpdated.map((c) => (
-            <Pressable key={c.institutionId} onPress={() => router.push(`/clients/${c.institutionId}`)} className="py-1.5">
-              <Text className="text-neutral-300 text-sm">
-                {c.institutionName} — {new Date(c.lastVerifiedAt).toLocaleDateString('es', { year: 'numeric', month: 'short', day: 'numeric' })}
-              </Text>
+            <Pressable key={c.institutionId} onPress={() => router.push(`/clients/${c.institutionId}`)} className="bg-white border border-gray-200 rounded-lg p-3 mb-2">
+              <Text className="text-gray-900 text-sm font-semibold">{c.institutionName}</Text>
+              <Text className="text-gray-600 text-xs mt-1">{new Date(c.lastVerifiedAt).toLocaleDateString('es', { year: 'numeric', month: 'short', day: 'numeric' })}</Text>
             </Pressable>
           ))}
         </Section>
 
         {data.staleClients.length > 0 && (
-          <Section title={`Alertas de frescura (${data.staleClients.length})`}>
+          <Section title={`Alertas de Frescura (${data.staleClients.length})`}>
             {data.staleClients.map((c) => (
-              <Pressable key={c.institutionId} onPress={() => router.push(`/clients/${c.institutionId}`)} className="py-1.5">
-                <Text className="text-red-400 text-sm">
-                  {c.institutionName} — sin verificar hace {c.daysSinceVerified} días
-                </Text>
+              <Pressable key={c.institutionId} onPress={() => router.push(`/clients/${c.institutionId}`)} className="bg-red-50 border border-red-200 rounded-lg p-3 mb-2">
+                <Text className="text-red-700 text-sm font-semibold">{c.institutionName}</Text>
+                <Text className="text-red-600 text-xs mt-1">Sin verificar hace {c.daysSinceVerified} días</Text>
               </Pressable>
             ))}
           </Section>

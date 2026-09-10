@@ -165,113 +165,122 @@ export default function EquipmentDetailScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 bg-neutral-950 items-center justify-center">
-        <ActivityIndicator color="#fff" />
+      <SafeAreaView className="flex-1 bg-white items-center justify-center">
+        <ActivityIndicator color="#0066CC" size="large" />
       </SafeAreaView>
     );
   }
 
   if (!equipment) {
     return (
-      <SafeAreaView className="flex-1 bg-neutral-950 items-center justify-center">
-        <Text className="text-neutral-400">Equipo no encontrado.</Text>
+      <SafeAreaView className="flex-1 bg-white items-center justify-center">
+        <Text className="text-gray-600">Equipo no encontrado.</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-neutral-950">
+    <SafeAreaView className="flex-1 bg-white">
       <ScrollView contentContainerClassName="p-4 pb-12">
-        <Text className="text-neutral-500 text-xs uppercase mb-1">{institutionName}</Text>
-        <Text className="text-white text-2xl font-bold mb-1">{equipment.modality}</Text>
-        <Text className="text-neutral-500 text-xs mb-5">
+        <Text className="text-gray-600 text-xs font-semibold uppercase mb-1">{institutionName}</Text>
+        <Text className="text-gray-900 text-2xl font-bold mb-1">{equipment.modality}</Text>
+        <Text className="text-gray-500 text-xs mb-6">
           Última verificación: {fmtDate(equipment.lastVerifiedAt)}
         </Text>
 
         <Pressable
           onPress={handleScanPlate}
           disabled={scanning}
-          className="bg-neutral-900 border border-neutral-700 rounded-xl py-3 items-center mb-3 flex-row justify-center gap-2">
+          className="bg-blue-600 rounded-xl py-4 items-center mb-4 flex-row justify-center gap-2">
           {scanning ? (
             <>
               <ActivityIndicator color="#fff" />
-              <Text className="text-neutral-300">{scanProgress !== null ? `Cargando modelo… ${scanProgress}%` : 'Leyendo placa…'}</Text>
+              <Text className="text-white font-semibold">{scanProgress !== null ? `Cargando… ${scanProgress}%` : 'Leyendo placa…'}</Text>
             </>
           ) : (
-            <Text className="text-neutral-200 font-medium">📷 Escanear placa</Text>
+            <Text className="text-white font-semibold text-base">📷 Escanear Placa</Text>
           )}
         </Pressable>
 
         {scanResult && (
-          <View className="bg-neutral-900 rounded-xl p-4 mb-5 border border-blue-800">
-            <Text className="text-blue-400 text-xs uppercase mb-2">Leído de la placa</Text>
-            {scanResult.manufacturer && <Text className="text-white text-sm mb-1">Fabricante: {scanResult.manufacturer}</Text>}
-            {scanResult.model && <Text className="text-white text-sm mb-1">Modelo: {scanResult.model}</Text>}
-            {scanResult.serial && <Text className="text-white text-sm mb-1">Serial: {scanResult.serial}</Text>}
-            {scanResult.installYear && <Text className="text-white text-sm mb-1">Año: {scanResult.installYear}</Text>}
-            <View className="flex-row gap-2 mt-2">
-              <Pressable onPress={handleApplyScan} disabled={saving} className="flex-1 bg-blue-600 rounded-lg py-2 items-center">
-                <Text className="text-white font-medium">Aplicar como Confirmado</Text>
+          <View className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+            <Text className="text-blue-700 text-xs font-bold uppercase mb-3">Datos Leídos de la Placa</Text>
+            {scanResult.manufacturer && <Text className="text-gray-900 text-sm mb-2"><Text className="font-semibold">Fabricante:</Text> {scanResult.manufacturer}</Text>}
+            {scanResult.model && <Text className="text-gray-900 text-sm mb-2"><Text className="font-semibold">Modelo:</Text> {scanResult.model}</Text>}
+            {scanResult.serial && <Text className="text-gray-900 text-sm mb-2"><Text className="font-semibold">Serial:</Text> {scanResult.serial}</Text>}
+            {scanResult.installYear && <Text className="text-gray-900 text-sm mb-3"><Text className="font-semibold">Año:</Text> {scanResult.installYear}</Text>}
+            <View className="flex-row gap-2">
+              <Pressable onPress={handleApplyScan} disabled={saving} className="flex-1 bg-blue-600 rounded-lg py-2.5 items-center">
+                <Text className="text-white font-semibold">Aplicar como Confirmado</Text>
               </Pressable>
-              <Pressable onPress={() => setScanResult(null)} className="px-4 py-2 items-center">
-                <Text className="text-neutral-400">Descartar</Text>
+              <Pressable onPress={() => setScanResult(null)} className="px-4 py-2.5 items-center">
+                <Text className="text-gray-600 font-semibold">Descartar</Text>
               </Pressable>
             </View>
           </View>
         )}
 
-        <View className="bg-neutral-900 rounded-xl p-4 mb-5">
-          <View className="flex-row items-center gap-2 mb-3">
-            <TextInput
-              value={manufacturer}
-              onChangeText={setManufacturer}
-              placeholder="Fabricante"
-              placeholderTextColor="#71717a"
-              className="bg-neutral-800 text-white rounded-lg px-3 py-2 flex-1"
-            />
-            <StatusChip status={statusManufacturer} onPress={() => setStatusManufacturer(cycleStatus(statusManufacturer))} />
+        <View className="bg-white border border-gray-200 rounded-xl p-4 mb-6">
+          <View className="mb-4">
+            <Text className="text-gray-700 text-sm font-semibold mb-2">Fabricante</Text>
+            <View className="flex-row items-center gap-2">
+              <TextInput
+                value={manufacturer}
+                onChangeText={setManufacturer}
+                placeholder="Ej: Siemens"
+                placeholderTextColor="#9CA3AF"
+                className="bg-gray-50 text-gray-900 rounded-lg px-3 py-2 flex-1 border border-gray-200"
+              />
+              <StatusChip status={statusManufacturer} onPress={() => setStatusManufacturer(cycleStatus(statusManufacturer))} />
+            </View>
           </View>
 
-          <View className="flex-row items-center gap-2 mb-3">
-            <TextInput
-              value={model}
-              onChangeText={setModel}
-              placeholder="Modelo"
-              placeholderTextColor="#71717a"
-              className="bg-neutral-800 text-white rounded-lg px-3 py-2 flex-1"
-            />
-            <StatusChip status={statusModel} onPress={() => setStatusModel(cycleStatus(statusModel))} />
+          <View className="mb-4">
+            <Text className="text-gray-700 text-sm font-semibold mb-2">Modelo</Text>
+            <View className="flex-row items-center gap-2">
+              <TextInput
+                value={model}
+                onChangeText={setModel}
+                placeholder="Ej: Magnetom"
+                placeholderTextColor="#9CA3AF"
+                className="bg-gray-50 text-gray-900 rounded-lg px-3 py-2 flex-1 border border-gray-200"
+              />
+              <StatusChip status={statusModel} onPress={() => setStatusModel(cycleStatus(statusModel))} />
+            </View>
           </View>
 
-          <TextInput
-            value={serial}
-            onChangeText={setSerial}
-            placeholder="Número de serie"
-            placeholderTextColor="#71717a"
-            className="bg-neutral-800 text-white rounded-lg px-3 py-2 mb-3"
-          />
+          <View className="mb-4">
+            <Text className="text-gray-700 text-sm font-semibold mb-2">Número de Serie</Text>
+            <TextInput
+              value={serial}
+              onChangeText={setSerial}
+              placeholder="Ej: SN123456"
+              placeholderTextColor="#9CA3AF"
+              className="bg-gray-50 text-gray-900 rounded-lg px-3 py-2 border border-gray-200"
+            />
+          </View>
 
-          <View className="flex-row gap-2 mb-3">
+          <View className="flex-row gap-3 mb-4">
             <View className="flex-1">
-              <Text className="text-neutral-500 text-xs mb-1">Cantidad</Text>
+              <Text className="text-gray-700 text-sm font-semibold mb-2">Cantidad</Text>
               <TextInput
                 value={count}
                 onChangeText={setCount}
                 keyboardType="number-pad"
                 placeholder="—"
-                placeholderTextColor="#71717a"
-                className="bg-neutral-800 text-white rounded-lg px-3 py-2"
+                placeholderTextColor="#9CA3AF"
+                className="bg-gray-50 text-gray-900 rounded-lg px-3 py-2 border border-gray-200"
               />
             </View>
             <View className="flex-1">
-              <Text className="text-neutral-500 text-xs mb-1">Año de instalación</Text>
+              <Text className="text-gray-700 text-sm font-semibold mb-2">Año de Instalación</Text>
               <TextInput
                 value={installYear}
                 onChangeText={setInstallYear}
                 keyboardType="number-pad"
                 placeholder="—"
-                placeholderTextColor="#71717a"
-                className="bg-neutral-800 text-white rounded-lg px-3 py-2"
+                placeholderTextColor="#9CA3AF"
+                className="bg-gray-50 text-gray-900 rounded-lg px-3 py-2 border border-gray-200"
               />
             </View>
           </View>
@@ -280,23 +289,27 @@ export default function EquipmentDetailScreen() {
           </View>
         </View>
 
-        <Pressable onPress={handleSave} disabled={saving} className="bg-emerald-600 rounded-xl py-3 items-center mb-8">
-          {saving ? <ActivityIndicator color="#fff" /> : <Text className="text-white font-semibold">Guardar cambios</Text>}
+        <Pressable onPress={handleSave} disabled={saving} className="bg-green-600 rounded-xl py-4 items-center mb-8">
+          {saving ? <ActivityIndicator color="#fff" /> : <Text className="text-white font-semibold text-base">💾 Guardar Cambios</Text>}
         </Pressable>
 
-        <Text className="text-neutral-500 text-xs uppercase mb-2">
-          Historial de observaciones ({claims.length})
+        <Text className="text-gray-700 text-sm font-bold uppercase mb-3">
+          Historial de Observaciones ({claims.length})
         </Text>
-        {claims.length === 0 && <Text className="text-neutral-600">Sin observaciones registradas.</Text>}
+        {claims.length === 0 && (
+          <View className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+            <Text className="text-gray-600">Sin observaciones registradas.</Text>
+          </View>
+        )}
         {claims.map((c) => (
-          <View key={c.id} className="bg-neutral-900 rounded-lg p-3 mb-2">
-            <View className="flex-row items-center justify-between mb-1">
-              <Text className="text-white text-sm font-medium">{FIELD_LABEL[c.field] ?? c.field}</Text>
+          <View key={c.id} className="bg-white border border-gray-200 rounded-lg p-3 mb-2">
+            <View className="flex-row items-center justify-between mb-2">
+              <Text className="text-gray-900 text-sm font-semibold">{FIELD_LABEL[c.field] ?? c.field}</Text>
               <StatusChip status={c.status} />
             </View>
-            {c.value && <Text className="text-neutral-300 text-sm mb-1">{c.value}</Text>}
-            {c.evidence && <Text className="text-neutral-500 text-xs italic mb-1">"{c.evidence}"</Text>}
-            <Text className="text-neutral-600 text-xs">
+            {c.value && <Text className="text-gray-700 text-sm mb-2">{c.value}</Text>}
+            {c.evidence && <Text className="text-gray-600 text-xs italic mb-2">"{c.evidence}"</Text>}
+            <Text className="text-gray-500 text-xs">
               {fmtDate(c.observedAt)} · {c.observerId} · {SOURCE_LABEL[c.source] ?? c.source}
             </Text>
           </View>

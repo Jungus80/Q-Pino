@@ -87,19 +87,19 @@ export default function MapScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 bg-neutral-950 items-center justify-center">
-        <ActivityIndicator color="#fff" />
+      <SafeAreaView className="flex-1 bg-white items-center justify-center">
+        <ActivityIndicator color="#0066CC" size="large" />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-neutral-950">
+    <SafeAreaView className="flex-1 bg-white">
       <ScrollView contentContainerClassName="p-4 pb-12">
-        <Text className="text-white text-2xl font-bold mb-1">Mapa</Text>
-        <Text className="text-neutral-400 mb-4">Toca un país para ver sus ciudades y clientes.</Text>
+        <Text className="text-gray-900 text-2xl font-bold mb-1">Mapa</Text>
+        <Text className="text-gray-500 text-sm mb-4">Toca un país para ver sus ciudades y clientes.</Text>
 
-        <View className="bg-neutral-900 rounded-xl overflow-hidden mb-4">
+        <View className="bg-white border border-gray-200 rounded-xl overflow-hidden mb-4">
           <Svg width={MAP_WIDTH} height={MAP_HEIGHT}>
             {geoJson.features.map((feature) => {
               const iso = feature.properties.iso;
@@ -110,8 +110,8 @@ export default function MapScreen() {
                   key={iso}
                   d={d}
                   fill={colorForCount(count, maxCount)}
-                  stroke={selectedCountry === iso ? '#93c5fd' : '#0a0a0a'}
-                  strokeWidth={selectedCountry === iso ? 1.5 : 0.5}
+                  stroke={selectedCountry === iso ? '#0066CC' : '#E5E7EB'}
+                  strokeWidth={selectedCountry === iso ? 2 : 1}
                   onPress={() => setSelectedCountry((prev) => (prev === iso ? null : iso))}
                 />
               );
@@ -119,16 +119,16 @@ export default function MapScreen() {
           </Svg>
         </View>
 
-        <View className="flex-row flex-wrap gap-2 mb-5">
+        <View className="flex-row flex-wrap gap-2 mb-6">
           {Object.entries(equipmentCountByCountry)
             .sort((a, b) => b[1] - a[1])
             .map(([iso, count]) => (
               <Pressable
                 key={iso}
                 onPress={() => setSelectedCountry((prev) => (prev === iso ? null : iso))}
-                className={`rounded-full px-3 py-1 ${selectedCountry === iso ? 'bg-blue-600' : 'bg-neutral-900'}`}>
-                <Text className="text-white text-xs">
-                  {iso}: <Text className="font-semibold">{count}</Text>
+                className={`rounded-full px-3 py-1.5 ${selectedCountry === iso ? 'bg-blue-600' : 'bg-blue-100'}`}>
+                <Text className={`text-xs font-semibold ${selectedCountry === iso ? 'text-white' : 'text-blue-700'}`}>
+                  {iso}: <Text className="font-bold">{count}</Text>
                 </Text>
               </Pressable>
             ))}
@@ -136,28 +136,32 @@ export default function MapScreen() {
 
         {selectedCountry ? (
           <View>
-            <Text className="text-neutral-500 text-xs uppercase mb-2">
+            <Text className="text-gray-700 text-sm font-bold uppercase mb-3">
               {selectedCountry} — {citiesInSelected.reduce((sum, [, list]) => sum + list.length, 0)} clientes
             </Text>
             {citiesInSelected.map(([city, insts]) => (
-              <View key={city} className="mb-3">
-                <Text className="text-neutral-400 text-sm font-medium mb-1">{city}</Text>
+              <View key={city} className="mb-4">
+                <Text className="text-gray-700 text-sm font-semibold mb-2">{city}</Text>
                 {insts.map((inst) => (
                   <Pressable
                     key={inst.id}
                     onPress={() => router.push(`/clients/${inst.id}`)}
-                    className="bg-neutral-900 rounded-lg p-3 mb-1.5">
-                    <Text className="text-white text-sm">{inst.name}</Text>
+                    className="bg-white border border-gray-200 rounded-lg p-3 mb-2">
+                    <Text className="text-gray-900 text-sm font-semibold">{inst.name}</Text>
                   </Pressable>
                 ))}
               </View>
             ))}
             {citiesInSelected.length === 0 && (
-              <Text className="text-neutral-600 text-sm">Sin clientes registrados en este país.</Text>
+              <View className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                <Text className="text-gray-600 text-sm">Sin clientes registrados en este país.</Text>
+              </View>
             )}
           </View>
         ) : (
-          <Text className="text-neutral-600 text-sm">Selecciona un país en el mapa o en la lista de arriba.</Text>
+          <View className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <Text className="text-blue-700 text-sm font-medium">Selecciona un país en el mapa o en la lista de arriba.</Text>
+          </View>
         )}
       </ScrollView>
     </SafeAreaView>

@@ -66,31 +66,33 @@ export default function ClientsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 bg-neutral-950 items-center justify-center">
-        <ActivityIndicator color="#fff" />
+      <SafeAreaView className="flex-1 bg-white items-center justify-center">
+        <ActivityIndicator color="#0066CC" size="large" />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-neutral-950">
-      <View className="px-4 pt-2 pb-3">
-        <View className="flex-row items-center justify-between">
-          <Text className="text-white text-2xl font-bold mb-1">Clientes</Text>
-          <Pressable onPress={handleReset}>
-            <Text className="text-red-400 text-xs">Reiniciar datos</Text>
+    <SafeAreaView className="flex-1 bg-white">
+      <View className="px-4 pt-4 pb-4 border-b border-gray-200">
+        <View className="flex-row items-center justify-between mb-3">
+          <View>
+            <Text className="text-gray-900 text-2xl font-bold">Clientes</Text>
+            <Text className="text-gray-500 text-sm mt-1">
+              {institutions.length} clientes · {Object.values(totalsByModality).reduce((a, b) => a + b, 0)} equipos
+            </Text>
+          </View>
+          <Pressable onPress={handleReset} className="bg-red-50 rounded-lg px-3 py-2">
+            <Text className="text-red-600 text-xs font-semibold">Reiniciar</Text>
           </Pressable>
         </View>
-        <Text className="text-neutral-400 mb-3">
-          {institutions.length} clientes · {Object.values(totalsByModality).reduce((a, b) => a + b, 0)} equipos
-        </Text>
         <View className="flex-row flex-wrap gap-2">
           {Object.entries(totalsByModality)
             .sort((a, b) => b[1] - a[1])
             .map(([modality, count]) => (
-              <View key={modality} className="bg-neutral-900 rounded-full px-3 py-1">
-                <Text className="text-neutral-300 text-xs">
-                  {modality}: <Text className="text-white font-semibold">{count}</Text>
+              <View key={modality} className="bg-blue-100 rounded-full px-3 py-1.5">
+                <Text className="text-blue-700 text-xs font-semibold">
+                  {modality}: <Text className="font-bold">{count}</Text>
                 </Text>
               </View>
             ))}
@@ -100,23 +102,23 @@ export default function ClientsScreen() {
       <FlatList
         data={institutions}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 12 }}
         renderItem={({ item }) => (
           <Pressable
             onPress={() => router.push(`/clients/${item.id}`)}
-            className="bg-neutral-900 rounded-xl p-4 mb-3">
-            <Text className="text-white font-semibold text-base">{item.name}</Text>
-            <Text className="text-neutral-400 text-sm mt-0.5">
+            className="bg-white border border-gray-200 rounded-xl p-4 mb-3">
+            <Text className="text-gray-900 font-bold text-base">{item.name}</Text>
+            <Text className="text-gray-600 text-sm mt-1">
               {[item.city, item.countryIso].filter(Boolean).join(', ') || 'Ubicación desconocida'}
             </Text>
-            <View className="flex-row flex-wrap gap-1 mt-2">
+            <View className="flex-row flex-wrap gap-2 mt-3">
               {item.modalities.map((m) => (
-                <View key={m} className="bg-neutral-800 rounded px-2 py-0.5">
-                  <Text className="text-neutral-300 text-xs">{m}</Text>
+                <View key={m} className="bg-blue-50 rounded-lg px-2.5 py-1">
+                  <Text className="text-blue-700 text-xs font-semibold">{m}</Text>
                 </View>
               ))}
               {item.modalities.length === 0 && (
-                <Text className="text-neutral-600 text-xs">Sin equipos registrados</Text>
+                <Text className="text-gray-500 text-xs">Sin equipos registrados</Text>
               )}
             </View>
           </Pressable>

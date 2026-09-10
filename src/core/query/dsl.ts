@@ -48,6 +48,33 @@ export function describeQueryDsl(dsl: QueryDsl): string[] {
   return chips;
 }
 
+/**
+ * Defensive cleanup for a QueryDsl the LLM just produced. A 2B model under grammar
+ * constraint sometimes "fills in" a field instead of leaving it empty when it isn't sure
+ * — the same failure mode extraction had, and observed live for query parsing: "Equipos
+ * por modalidad" (a request to group by modality, no filter) came back with every single
+ * modality value listed instead of an empty array plus groupBy. The prompt's few-shot
+ * examples target this directly, but a second, deterministic safety net catches whatever
+ * slips through:
+ *  - listing every modality is indistinguishable from "no filter" (an IN clause matching
+ *    every row), so collapse it to [] rather than waste the join and mislead the chip UI.
+ *  - minAge: 0 is a mathematical no-op (age is never negative) regardless of intent.
+ *  - maxAge: 0 would exclude every real row (nothing installed has zero-yet age), so a
+ *    hallucinated 0 is far more likely than a genuine "brand new equipment only" query —
+ *    drop it rather than silently return an empty result set.
+ */
+export function sanitizeQueryDsl(dsl: QueryDsl): QueryDsl {
+  const next = { ...dsl };
+  if (next.modality.length === MODALITIES.length) next.modality = [];
+  if (next.minAge === 0) delete next.minAge;
+  if (next.maxAge === 0) delete next.maxAge;
+  if (next.minAge !== undefined && next.maxAge !== undefined && next.minAge > next.maxAge) {
+    delete next.minAge;
+    delete next.maxAge;
+  }
+  return next;
+}
+
 export function isEmptyQueryDsl(dsl: QueryDsl): boolean {
   return (
     dsl.region.length === 0 &&
