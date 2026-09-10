@@ -17,7 +17,13 @@ const SAMPLE_RATE = 16000;
  * 'error' event, not a rejected promise). Two clean request/response calls — record, then
  * transcribe — has no such race and was already proven reliable in the phase-0 spike.
  * `audioLevel` still updates live from the raw mic signal so the UI can show a waveform
- * while recording, independent of transcription (which now only starts after `stop()`).
+ * while recording, independent of transcription (which only starts after `stop()`).
+ *
+ * Model loading is kicked off in parallel with the recording itself (not started only
+ * after the user taps stop) — recording an utterance takes several seconds, which is
+ * usually enough time for Whisper to finish loading in the background, so by the time
+ * `stop()` runs the model is often already resident and transcription starts immediately
+ * instead of after a visible load delay.
  */
 export function useVoiceCapture() {
   const { startRecording, stopRecording } = useAudioRecorder();
@@ -28,6 +34,7 @@ export function useVoiceCapture() {
   const [error, setError] = useState<string | null>(null);
 
   const busyRef = useRef(false); // guards against a double-tap firing start() twice
+  const modelPromiseRef = useRef<Promise<string> | null>(null);
 
   const start = useCallback(async () => {
     if (busyRef.current) return;
@@ -42,6 +49,17 @@ export function useVoiceCapture() {
           'Sin permiso de micrófono. Actívalo en Ajustes > QVAC > Micrófono y vuelve a intentar.'
         );
       }
+
+      // Fire the model load now, in parallel with recording — do NOT await it here.
+      // stop() awaits this same promise instead of starting a fresh load.
+      setIsLoadingModel(true);
+      modelPromiseRef.current = loadExclusive({
+        modelSrc: WHISPER_SMALL_Q8_0,
+        modelType: 'whisper',
+        // 'auto' lets Whisper detect the spoken language per-clip instead of assuming
+        // Spanish — the app is used in es/pt/en per the plan.
+        modelConfig: { language: 'auto' },
+      }).finally(() => setIsLoadingModel(false));
 
       step = 'START_RECORDING';
       await startRecording({
@@ -66,21 +84,23 @@ export function useVoiceCapture() {
     setIsRecording(false);
     setAudioLevel(0);
     let step = 'STOP_RECORDING';
-    let modelId: string | null = null;
     try {
       const result = await stopRecording();
       const filePath = result.fileUri.replace(/^file:\/\//, '');
 
       step = 'LOAD_MODEL';
-      setIsLoadingModel(true);
-      modelId = await loadExclusive({
-        modelSrc: WHISPER_SMALL_Q8_0,
-        modelType: 'whisper',
-        // 'auto' lets Whisper detect the spoken language per-clip instead of assuming
-        // Spanish — the app is used in es/pt/en per the plan.
-        modelConfig: { language: 'auto' },
-      });
-      setIsLoadingModel(false);
+      if (!modelPromiseRef.current) {
+        // start() never ran (or failed before kicking off the load) — fall back to
+        // loading here so stop() still works standalone.
+        setIsLoadingModel(true);
+        modelPromiseRef.current = loadExclusive({
+          modelSrc: WHISPER_SMALL_Q8_0,
+          modelType: 'whisper',
+          modelConfig: { language: 'auto' },
+        }).finally(() => setIsLoadingModel(false));
+      }
+      const modelId = await modelPromiseRef.current;
+      modelPromiseRef.current = null;
 
       step = 'TRANSCRIBE';
       setIsTranscribing(true);
