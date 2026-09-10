@@ -1,5 +1,6 @@
 import { getDb } from '../client';
-import { normalizeInstitutionName, nameSimilarity } from '../../core/normalize/text';
+import { normalizeInstitutionName } from '../../core/normalize/text';
+import { resolveInstitution, type InstitutionMatch } from '../../core/resolve/institution';
 
 export type InstitutionRow = {
   id: string;
@@ -64,29 +65,17 @@ export async function insertInstitution(input: {
   );
 }
 
-const AUTO_MATCH_THRESHOLD = 0.9;
-
 /**
- * Lightweight MVP entity resolution: fuzzy-match a candidate institution name/city
- * against every existing institution and auto-attach above a conservative threshold.
- * This is intentionally simple — full multi-signal resolution (aliases, embeddings,
- * an ask-the-user band for the 0.75-0.9 zone) is phase 3 of the plan. Never merges
- * equipment; only decides which institution a new observation's equipment attaches to.
+ * Fetches the current roster and runs it through src/core/resolve/institution.ts.
+ * `ask`-band matches are surfaced in the result but saveObservation.ts currently treats
+ * them the same as `new` — the interactive "¿es el mismo que X?" confirmation UI is not
+ * built yet, so nothing auto-merges on a merely-plausible name match.
  */
-export async function findMatchingInstitution(
-  candidate: { name: string; city: string | null; countryIso: string | null }
-): Promise<{ institution: InstitutionRow; score: number } | null> {
+export async function matchInstitution(candidate: {
+  name: string;
+  city: string | null;
+  countryIso: string | null;
+}): Promise<InstitutionMatch> {
   const existing = await listInstitutions();
-  let best: { institution: InstitutionRow; score: number } | null = null;
-
-  for (const institution of existing) {
-    if (candidate.countryIso && institution.countryIso && candidate.countryIso !== institution.countryIso) {
-      continue; // blocking: never match across countries
-    }
-    const score = nameSimilarity(candidate.name, institution.name);
-    if (score >= AUTO_MATCH_THRESHOLD && (!best || score > best.score)) {
-      best = { institution, score };
-    }
-  }
-  return best;
+  return resolveInstitution(candidate, existing);
 }

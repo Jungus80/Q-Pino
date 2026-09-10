@@ -1,4 +1,7 @@
 import { newId } from '../core/id';
+import { assignToSlot, type AssetSlot, type NewAssetClaim } from '../core/resolve/asset';
+import { reconcileCount } from '../core/resolve/fleet';
+import { chooseBetween } from '../core/truth/consolidate';
 import type {
   ExtractedObservation,
   FieldStatus,
@@ -6,8 +9,13 @@ import type {
   NormalizedInstitution,
   ObservationSource,
 } from '../core/schema/observation';
-import { findMatchingInstitution, insertInstitution } from './repos/institutions';
-import { insertEquipment } from './repos/equipment';
+import { matchInstitution, insertInstitution } from './repos/institutions';
+import {
+  insertEquipment,
+  listEquipmentForInstitutionModality,
+  updateEquipmentFields,
+  type EquipmentRow,
+} from './repos/equipment';
 import { insertObservation } from './repos/observations';
 import { insertClaims, type ClaimInput } from './repos/claims';
 
@@ -24,11 +32,19 @@ export type SaveObservationInput = {
   observerId?: string;
 };
 
+export type EquipmentOutcome =
+  | { kind: 'created'; equipmentId: string; modality: string }
+  | { kind: 'updated'; equipmentId: string; modality: string; changedFields: string[] }
+  | { kind: 'count_conflict'; equipmentId: string; modality: string; existingCount: number; incomingCount: number }
+  | { kind: 'ambiguous'; modality: string; candidateEquipmentIds: string[] }
+  | { kind: 'skipped_no_count_no_details'; modality: string };
+
 export type SaveObservationResult = {
   observationId: string;
   institutionId: string;
   institutionCreated: boolean;
-  equipmentIds: string[];
+  institutionMatchKind: 'auto_merge' | 'ask' | 'new';
+  equipment: EquipmentOutcome[];
 };
 
 function claim(
@@ -53,13 +69,44 @@ function claim(
   };
 }
 
+function toAssetSlot(row: EquipmentRow): AssetSlot {
+  return {
+    id: row.id,
+    manufacturer: row.manufacturer,
+    model: row.model,
+    serial: row.serial,
+    installYearLo: row.installYearLo,
+    installYearHi: row.installYearHi,
+    statusManufacturer: row.statusManufacturer,
+    statusModel: row.statusModel,
+    statusAge: row.statusAge,
+    whichUnit: null, // not persisted per-row today; slot matching still works off the rest
+    catalogModelId: row.catalogModelId,
+  };
+}
+
+function toAssetClaim(item: NormalizedEquipment): NewAssetClaim {
+  return {
+    manufacturer: item.manufacturer,
+    model: item.model,
+    serial: item.serial,
+    installYearLo: item.installYearLo,
+    installYearHi: item.installYearHi,
+    statusManufacturer: item.fieldStatus.manufacturer,
+    statusModel: item.fieldStatus.model,
+    statusAge: item.fieldStatus.age,
+    whichUnit: item.whichUnit,
+    catalogModelId: item.catalogModelId,
+  };
+}
+
 /**
- * Persists one reviewed observation: matches (or creates) the institution, inserts an
- * equipment row per item, and records a claim per field so every current value stays
- * backed by the observation that asserted it. Not wrapped in a single DB transaction
- * across all three repos (op-sqlite transactions are per-connection-callback) — if this
- * throws partway through, the caller should treat the observation as unsaved and retry;
- * nothing here is exposed to the UI as "saved" until it returns.
+ * Persists one reviewed observation through the full entity-resolution pipeline: matches
+ * (or creates) the institution, then for each equipment claim either merges it onto an
+ * existing piece of equipment, creates a new one, reconciles a fleet-count claim, or
+ * leaves an ambiguous claim unassigned rather than guess (see src/core/resolve/asset.ts).
+ * Every field written or considered is recorded as a claim regardless of outcome, so the
+ * evidence trail exists even for claims that didn't change anything.
  */
 export async function saveObservation(input: SaveObservationInput): Promise<SaveObservationResult> {
   const observerId = input.observerId ?? DEFAULT_OBSERVER_ID;
@@ -82,16 +129,19 @@ export async function saveObservation(input: SaveObservationInput): Promise<Save
 
   const match =
     input.institution.name != null
-      ? await findMatchingInstitution({
+      ? await matchInstitution({
           name: input.institution.name,
           city: input.institution.city,
           countryIso: input.institution.countryIso,
         })
-      : null;
+      : { kind: 'new' as const };
 
-  if (match) {
+  if (match.kind === 'auto_merge') {
     institutionId = match.institution.id;
   } else {
+    // 'ask'-band matches fall through to creating a new institution — there is no
+    // interactive "¿es el mismo que X?" confirmation UI yet (src/db/repos/institutions.ts
+    // still exposes the match so that UI can be added without touching this logic).
     institutionId = newId('inst');
     institutionCreated = true;
     await insertInstitution({
@@ -109,9 +159,7 @@ export async function saveObservation(input: SaveObservationInput): Promise<Save
   const claims: ClaimInput[] = [];
 
   if (input.institution.name) {
-    claims.push(
-      claim(base, { institutionId, equipmentId: null }, 'name', input.institution.name, 'Reportado', input.institution.name)
-    );
+    claims.push(claim(base, { institutionId, equipmentId: null }, 'name', input.institution.name, 'Reportado', input.institution.name));
   }
   if (input.institution.city) {
     claims.push(claim(base, { institutionId, equipmentId: null }, 'city', input.institution.city, 'Reportado', input.institution.city));
@@ -122,12 +170,135 @@ export async function saveObservation(input: SaveObservationInput): Promise<Save
     );
   }
 
-  const equipmentIds: string[] = [];
-  for (const item of input.equipment) {
-    const equipmentId = newId('eq');
-    equipmentIds.push(equipmentId);
-    const evidence = item.evidence.join('. ') || null;
+  const outcomes: EquipmentOutcome[] = [];
 
+  for (const item of input.equipment) {
+    const evidence = item.evidence.join('. ') || null;
+    const hasDetails = Boolean(item.manufacturer || item.model || item.serial || item.whichUnit);
+    const existingRows = await listEquipmentForInstitutionModality(institutionId, item.modality);
+
+    if (!hasDetails) {
+      // A bare fleet-count claim ("tienen dos resonadores") with nothing distinguishing
+      // one unit from another. Reconcile against a single existing aggregate row if
+      // there's exactly one; otherwise this is either brand new or the fleet has already
+      // been split into distinct tracked units, in which case a bare count claim can't
+      // be safely folded into any one of them — record it as its own row for visibility.
+      if (item.count == null) {
+        outcomes.push({ kind: 'skipped_no_count_no_details', modality: item.modality });
+        continue;
+      }
+
+      const soleAggregate = existingRows.length === 1 ? existingRows[0] : null;
+      if (soleAggregate) {
+        const reconciled = reconcileCount(
+          { count: soleAggregate.count ?? soleAggregate.count!, status: soleAggregate.statusCount, observedAt: soleAggregate.lastVerifiedAt },
+          { count: item.count, status: item.fieldStatus.count, observedAt: now }
+        );
+        await updateEquipmentFields(soleAggregate.id, {
+          count: reconciled.count,
+          statusCount: reconciled.status,
+          lastVerifiedAt: now,
+        });
+        claims.push(claim(base, { institutionId: null, equipmentId: soleAggregate.id }, 'count', item.count, item.fieldStatus.count, evidence));
+        outcomes.push(
+          reconciled.conflict
+            ? { kind: 'count_conflict', equipmentId: soleAggregate.id, modality: item.modality, existingCount: soleAggregate.count ?? 0, incomingCount: item.count }
+            : { kind: 'updated', equipmentId: soleAggregate.id, modality: item.modality, changedFields: ['count'] }
+        );
+        continue;
+      }
+
+      const equipmentId = newId('eq');
+      await insertEquipment({
+        id: equipmentId,
+        institutionId,
+        modality: item.modality,
+        manufacturer: null,
+        model: null,
+        serial: null,
+        count: item.count,
+        installYearLo: item.installYearLo,
+        installYearHi: item.installYearHi,
+        statusManufacturer: 'Desconocido',
+        statusModel: 'Desconocido',
+        statusAge: item.fieldStatus.age,
+        statusCount: item.fieldStatus.count,
+        catalogModelId: null,
+        whichUnit: null,
+        lastVerifiedAt: now,
+        createdAt: now,
+      });
+      claims.push(claim(base, { institutionId: null, equipmentId }, 'count', item.count, item.fieldStatus.count, evidence));
+      outcomes.push({ kind: existingRows.length === 0 ? 'created' : 'created', equipmentId, modality: item.modality });
+      continue;
+    }
+
+    // Claim carries distinguishing detail — try to attach it to a specific existing unit.
+    const assignment = assignToSlot(toAssetClaim(item), existingRows.map(toAssetSlot));
+
+    if (assignment.kind === 'ambiguous') {
+      claims.push(claim(base, { institutionId: null, equipmentId: null }, 'unassigned_equipment_claim', item.model ?? item.manufacturer, item.fieldStatus.model, evidence));
+      outcomes.push({ kind: 'ambiguous', modality: item.modality, candidateEquipmentIds: assignment.candidateIds });
+      continue;
+    }
+
+    if (assignment.kind === 'matched') {
+      const existing = existingRows.find((r) => r.id === assignment.slotId)!;
+      const changedFields: string[] = [];
+      const patch: Parameters<typeof updateEquipmentFields>[1] = { lastVerifiedAt: now };
+
+      if (item.manufacturer) {
+        const r = chooseBetween(
+          { value: existing.manufacturer, status: existing.statusManufacturer, observedAt: existing.lastVerifiedAt },
+          { value: item.manufacturer, status: item.fieldStatus.manufacturer, observedAt: now }
+        );
+        if (r.changed) {
+          patch.manufacturer = r.value;
+          patch.statusManufacturer = r.status;
+          changedFields.push('manufacturer');
+        }
+      }
+      if (item.model) {
+        const r = chooseBetween(
+          { value: existing.model, status: existing.statusModel, observedAt: existing.lastVerifiedAt },
+          { value: item.model, status: item.fieldStatus.model, observedAt: now }
+        );
+        if (r.changed) {
+          patch.model = r.value;
+          patch.statusModel = r.status;
+          changedFields.push('model');
+        }
+      }
+      if (item.serial && !existing.serial) {
+        patch.serial = item.serial;
+        changedFields.push('serial');
+      }
+      if (item.installYearLo != null) {
+        const r = chooseBetween(
+          existing.installYearLo != null
+            ? { value: existing.installYearLo, status: existing.statusAge, observedAt: existing.lastVerifiedAt }
+            : null,
+          { value: item.installYearLo, status: item.fieldStatus.age, observedAt: now }
+        );
+        if (r.changed) {
+          patch.installYearLo = item.installYearLo;
+          patch.installYearHi = item.installYearHi;
+          patch.statusAge = r.status;
+          changedFields.push('age');
+        }
+      }
+      if (item.catalogModelId && !existing.catalogModelId) {
+        patch.catalogModelId = item.catalogModelId;
+      }
+
+      await updateEquipmentFields(existing.id, patch);
+      claims.push(claim(base, { institutionId: null, equipmentId: existing.id }, 'match', item.model ?? item.manufacturer, item.fieldStatus.model, evidence));
+      outcomes.push({ kind: 'updated', equipmentId: existing.id, modality: item.modality, changedFields });
+      continue;
+    }
+
+    // no_match — a genuinely new, distinct piece of equipment.
+    const equipmentId = newId('eq');
     await insertEquipment({
       id: equipmentId,
       institutionId,
@@ -147,18 +318,20 @@ export async function saveObservation(input: SaveObservationInput): Promise<Save
       lastVerifiedAt: now,
       createdAt: now,
     });
-
-    const target = { institutionId: null, equipmentId };
-    if (item.manufacturer) claims.push(claim(base, target, 'manufacturer', item.manufacturer, item.fieldStatus.manufacturer, evidence));
-    if (item.model) claims.push(claim(base, target, 'model', item.model, item.fieldStatus.model, evidence));
-    if (item.serial) claims.push(claim(base, target, 'serial', item.serial, 'Confirmado', evidence));
-    if (item.count != null) claims.push(claim(base, target, 'count', item.count, item.fieldStatus.count, evidence));
-    if (item.installYearLo != null) {
-      claims.push(claim(base, target, 'installYear', `${item.installYearLo}-${item.installYearHi}`, item.fieldStatus.age, evidence));
-    }
+    if (item.manufacturer) claims.push(claim(base, { institutionId: null, equipmentId }, 'manufacturer', item.manufacturer, item.fieldStatus.manufacturer, evidence));
+    if (item.model) claims.push(claim(base, { institutionId: null, equipmentId }, 'model', item.model, item.fieldStatus.model, evidence));
+    if (item.serial) claims.push(claim(base, { institutionId: null, equipmentId }, 'serial', item.serial, 'Confirmado', evidence));
+    if (item.count != null) claims.push(claim(base, { institutionId: null, equipmentId }, 'count', item.count, item.fieldStatus.count, evidence));
+    outcomes.push({ kind: 'created', equipmentId, modality: item.modality });
   }
 
   await insertClaims(claims);
 
-  return { observationId, institutionId, institutionCreated, equipmentIds };
+  return {
+    observationId,
+    institutionId,
+    institutionCreated,
+    institutionMatchKind: match.kind,
+    equipment: outcomes,
+  };
 }

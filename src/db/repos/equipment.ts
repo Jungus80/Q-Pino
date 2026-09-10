@@ -58,6 +58,62 @@ export async function listAllEquipment(): Promise<EquipmentRow[]> {
   return (res.rows ?? []).map(fromRow);
 }
 
+export async function listEquipmentForInstitutionModality(
+  institutionId: string,
+  modality: Modality
+): Promise<EquipmentRow[]> {
+  const db = await getDb();
+  const res = await db.execute(
+    'SELECT * FROM equipment WHERE institution_id = ? AND modality = ? ORDER BY created_at',
+    [institutionId, modality]
+  );
+  return (res.rows ?? []).map(fromRow);
+}
+
+export type EquipmentFieldPatch = Partial<{
+  manufacturer: string | null;
+  model: string | null;
+  serial: string | null;
+  count: number | null;
+  installYearLo: number | null;
+  installYearHi: number | null;
+  statusManufacturer: FieldStatus;
+  statusModel: FieldStatus;
+  statusAge: FieldStatus;
+  statusCount: FieldStatus;
+  catalogModelId: string | null;
+  whichUnit: string | null;
+  lastVerifiedAt: string;
+}>;
+
+const PATCH_COLUMN_NAMES: Record<keyof EquipmentFieldPatch, string> = {
+  manufacturer: 'manufacturer',
+  model: 'model',
+  serial: 'serial',
+  count: 'count',
+  installYearLo: 'install_year_lo',
+  installYearHi: 'install_year_hi',
+  statusManufacturer: 'status_manufacturer',
+  statusModel: 'status_model',
+  statusAge: 'status_age',
+  statusCount: 'status_count',
+  catalogModelId: 'catalog_model_id',
+  whichUnit: 'which_unit',
+  lastVerifiedAt: 'last_verified_at',
+};
+
+/** Updates only the given fields on an existing equipment row — used when a new
+ * observation's claim wins a field on an already-matched piece of equipment (see
+ * src/core/truth/consolidate.ts), instead of inserting a duplicate row. */
+export async function updateEquipmentFields(id: string, patch: EquipmentFieldPatch): Promise<void> {
+  const entries = Object.entries(patch) as [keyof EquipmentFieldPatch, unknown][];
+  if (entries.length === 0) return;
+  const db = await getDb();
+  const setClause = entries.map(([key]) => `${PATCH_COLUMN_NAMES[key]} = ?`).join(', ');
+  const values = entries.map(([, value]) => (value ?? null) as string | number | null);
+  await db.execute(`UPDATE equipment SET ${setClause} WHERE id = ?`, [...values, id]);
+}
+
 export async function insertEquipment(input: {
   id: string;
   institutionId: string;
