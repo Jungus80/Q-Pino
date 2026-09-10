@@ -32,6 +32,11 @@ export default function AppTabs() {
         <NativeTabs.Trigger.Label>Dashboard</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="chart.bar.fill" />
       </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="map">
+        <NativeTabs.Trigger.Label>Mapa</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="map.fill" />
+      </NativeTabs.Trigger>
     </NativeTabs>
   );
 }
