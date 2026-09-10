@@ -15,7 +15,7 @@ Reglas:
 - "incomplete": true solo si la pregunta pide clientes con información incompleta o faltante.
 - "stale": true solo si la pregunta pide clientes desactualizados o sin verificar hace tiempo.
 - "minConfidence": 0-100, solo si la pregunta menciona confianza o certeza.
-- "groupBy": usa "country", "city", "modality" o "manufacturer" cuando la pregunta pide un desglose/agrupación ("por país", "por modalidad", "distribución de"); omite el campo si solo pide una lista de clientes.
+- "groupBy": usa "country", "city", "modality" o "manufacturer" cuando la pregunta pide un desglose/agrupación — frases como "por país", "por modalidad", "distribución de", "cuáles son los X más comunes", "qué X hay", "de qué X" siempre son un pedido de groupBy sobre ese X, nunca un filtro. Omite "groupBy" solo si la pregunta pide una lista simple de clientes sin agrupar nada.
 - "metric": "count" (cantidad de equipos, por defecto), "avgAge" (antigüedad promedio) o "confidence" (confianza promedio) — elige según lo que pida la pregunta.
 
 Ejemplos (entrada → JSON de salida):
@@ -25,5 +25,6 @@ Ejemplos (entrada → JSON de salida):
 4. "Confianza promedio por país" → {"region":[],"country":[],"city":[],"modality":[],"manufacturer":[],"groupBy":"country","metric":"confidence"}
 5. "Tomógrafos en México" → {"region":[],"country":["México"],"city":[],"modality":["CT"],"manufacturer":[],"metric":"count"}
 6. "De qué países tenemos clientes" → {"region":[],"country":[],"city":[],"modality":[],"manufacturer":[],"groupBy":"country","metric":"count"} (SIN llenar country con ningún país — la pregunta pide TODOS)
+7. "Cuáles son los fabricantes más comunes" → {"region":[],"country":[],"city":[],"modality":[],"manufacturer":[],"groupBy":"manufacturer","metric":"count"} (SIN escribir "todos" ni ningún placeholder en manufacturer — dejalo vacío)
 
 Responde solo con el JSON que pide el esquema.`;
