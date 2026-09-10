@@ -9,20 +9,22 @@ let currentModelType: string | null = null;
 
 export type OnProgress = (percentage: number) => void;
 
+export type LoadParams = {
+  modelSrc: unknown;
+  modelType: string;
+  modelConfig?: Record<string, unknown>;
+  onProgress?: OnProgress;
+};
+
 /**
- * Loads `modelSrc` (unloading whatever model is currently resident first), runs `fn` with
- * the resulting modelId, then unloads it — even if `fn` throws. Reuses the already-loaded
- * model instead of reloading when the same (modelSrc, modelType) is requested back-to-back.
+ * Loads `modelSrc` (unloading whatever model is currently resident first) and returns its
+ * modelId. Reuses the already-loaded model instead of reloading when the same
+ * (modelSrc, modelType) is requested back-to-back. The caller owns unloading it (via
+ * `unloadCurrentModel()`) — use this instead of `withModel()` for capabilities that need
+ * the model to stay resident across more than one call, e.g. a streaming ASR session that
+ * spans start()...stop().
  */
-export async function withModel<T>(
-  params: {
-    modelSrc: unknown;
-    modelType: string;
-    modelConfig?: Record<string, unknown>;
-    onProgress?: OnProgress;
-  },
-  fn: (modelId: string) => Promise<T>
-): Promise<T> {
+export async function loadExclusive(params: LoadParams): Promise<string> {
   const key = `${params.modelType}:${JSON.stringify(params.modelSrc)}`;
 
   if (currentModelId && currentModelType !== key) {
@@ -41,7 +43,17 @@ export async function withModel<T>(
     currentModelType = key;
   }
 
-  return fn(currentModelId);
+  return currentModelId;
+}
+
+/**
+ * Loads `modelSrc`, runs `fn` with the resulting modelId, and leaves it loaded for reuse
+ * (see `loadExclusive`) — it is only unloaded when a *different* model is subsequently
+ * requested, or `unloadCurrentModel()` is called explicitly.
+ */
+export async function withModel<T>(params: LoadParams, fn: (modelId: string) => Promise<T>): Promise<T> {
+  const modelId = await loadExclusive(params);
+  return fn(modelId);
 }
 
 /** Releases whatever model is currently resident. Call when leaving the capture flow. */

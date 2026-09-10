@@ -3,6 +3,7 @@ import type { ExtractedObservation, FieldStatus, Modality, NormalizedEquipment, 
 import { FIELD_STATUSES, MODALITIES } from '@/core/schema/observation';
 import { saveObservation } from '@/db/saveObservation';
 import { extractObservation } from '@/ai/extract';
+import { useVoiceCapture } from '@/ai/asr';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
@@ -32,13 +33,28 @@ function cycleStatus(current: FieldStatus): FieldStatus {
 
 export default function CaptureScreen() {
   const router = useRouter();
+  const voice = useVoiceCapture();
   const [screen, setScreen] = useState<Screen>('input');
   const [text, setText] = useState('');
+  const [source, setSource] = useState<'text' | 'voice'>('text');
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [extraction, setExtraction] = useState<ExtractedObservation | null>(null);
   const [institution, setInstitution] = useState<NormalizedInstitution | null>(null);
   const [equipment, setEquipment] = useState<NormalizedEquipment[]>([]);
+
+  async function handleToggleVoice() {
+    if (voice.isRecording) {
+      const transcript = await voice.stop();
+      if (transcript.trim()) {
+        setText(transcript.trim());
+        setSource('voice');
+      }
+    } else {
+      setSource('voice');
+      await voice.start();
+    }
+  }
 
   async function handleExtract() {
     if (!text.trim()) return;
@@ -70,12 +86,13 @@ export default function CaptureScreen() {
         rawText: text.trim(),
         transcript: text.trim(),
         comments: extraction.comments,
-        source: 'text',
+        source,
         extraction,
         institution,
         equipment,
       });
       setText('');
+      setSource('text');
       setExtraction(null);
       setInstitution(null);
       setEquipment([]);
@@ -97,20 +114,51 @@ export default function CaptureScreen() {
 
         {screen === 'input' && (
           <>
-            <TextInput
-              value={text}
-              onChangeText={setText}
-              multiline
-              placeholder='Ej: "Estoy en Hospital DemoCare Pacific, en Panamá. Vi dos resonadores, uno parece de unos ocho años."'
-              placeholderTextColor="#71717a"
-              className="bg-neutral-900 text-white rounded-xl p-4 min-h-32 text-base"
-              style={{ textAlignVertical: 'top' }}
-            />
-            {error && <Text className="text-red-400 mt-3">{error}</Text>}
+            {voice.isRecording ? (
+              <View className="bg-neutral-900 rounded-xl p-4 min-h-32">
+                <View className="flex-row items-center mb-2">
+                  <View className="w-2 h-2 rounded-full bg-red-500 mr-2" />
+                  <Text className="text-red-400 text-xs font-medium">Grabando…</Text>
+                </View>
+                <Text className="text-white text-base">
+                  {voice.partialText || 'Escuchando…'}
+                </Text>
+              </View>
+            ) : (
+              <TextInput
+                value={text}
+                onChangeText={(v) => {
+                  setText(v);
+                  setSource('text');
+                }}
+                multiline
+                placeholder='Ej: "Estoy en Hospital DemoCare Pacific, en Panamá. Vi dos resonadores, uno parece de unos ocho años."'
+                placeholderTextColor="#71717a"
+                className="bg-neutral-900 text-white rounded-xl p-4 min-h-32 text-base"
+                style={{ textAlignVertical: 'top' }}
+              />
+            )}
+
+            <Pressable
+              onPress={handleToggleVoice}
+              disabled={voice.isLoadingModel}
+              className={`mt-3 rounded-xl py-3 items-center flex-row justify-center gap-2 ${
+                voice.isRecording ? 'bg-red-600' : 'bg-neutral-800'
+              }`}>
+              {voice.isLoadingModel ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text className="text-white font-semibold">
+                  {voice.isRecording ? '⏹  Detener y transcribir' : '🎙️  Dictar observación'}
+                </Text>
+              )}
+            </Pressable>
+
+            {(error || voice.error) && <Text className="text-red-400 mt-3">{error ?? voice.error}</Text>}
             <Pressable
               onPress={handleExtract}
-              disabled={!text.trim()}
-              className={`mt-4 rounded-xl py-3 items-center ${text.trim() ? 'bg-blue-600' : 'bg-neutral-800'}`}>
+              disabled={!text.trim() || voice.isRecording}
+              className={`mt-3 rounded-xl py-3 items-center ${text.trim() && !voice.isRecording ? 'bg-blue-600' : 'bg-neutral-800'}`}>
               <Text className="text-white font-semibold">Extraer información</Text>
             </Pressable>
           </>
