@@ -1,5 +1,5 @@
 import { newId } from '../core/id';
-import type { ExtractedObservation } from '../core/schema/observation';
+import type { ExtractedObservation, ObservationSource } from '../core/schema/observation';
 import { insertObservation } from './repos/observations';
 import { updateEquipmentFields, type EquipmentFieldPatch } from './repos/equipment';
 import { insertClaims, type ClaimInput } from './repos/claims';
@@ -34,6 +34,9 @@ export async function saveEquipmentEdit(input: {
   equipmentId: string;
   patch: EquipmentEditPatch;
   observerId?: string;
+  source?: ObservationSource;
+  rawText?: string;
+  evidenceLabel?: string;
 }): Promise<void> {
   const observerId = input.observerId ?? DEFAULT_OBSERVER_ID;
   const now = new Date().toISOString();
@@ -43,8 +46,8 @@ export async function saveEquipmentEdit(input: {
     id: observationId,
     observerId,
     createdAt: now,
-    source: 'text',
-    rawText: '[Edición manual desde Customer 360]',
+    source: input.source ?? 'text',
+    rawText: input.rawText ?? '[Edición manual desde Customer 360]',
     transcript: null,
     comments: null,
     extraction: EMPTY_EXTRACTION,
@@ -52,6 +55,7 @@ export async function saveEquipmentEdit(input: {
 
   const dbPatch: EquipmentFieldPatch = { lastVerifiedAt: now };
   const claims: ClaimInput[] = [];
+  const evidenceLabel = input.evidenceLabel ?? 'Editado manualmente';
 
   function claim(field: string, value: string | number | null) {
     claims.push({
@@ -62,7 +66,7 @@ export async function saveEquipmentEdit(input: {
       field,
       value: value == null ? null : String(value),
       status: 'Confirmado',
-      evidence: 'Editado manualmente',
+      evidence: evidenceLabel,
       observerId,
       observedAt: now,
     });
