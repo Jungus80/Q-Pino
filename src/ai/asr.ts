@@ -1,70 +1,39 @@
-import { transcribeStream, PARAKEET_TDT_0_6B_V3_Q4_0, type TranscribeStreamSession } from '@qvac/sdk';
+import { transcribe, PARAKEET_TDT_0_6B_V3_Q4_0 } from '@qvac/sdk';
 import { AudioStudioModule, useAudioRecorder } from '@siteed/audio-studio';
 import { toByteArray } from 'base64-js';
 import { useCallback, useRef, useState } from 'react';
 import { loadExclusive, unloadCurrentModel } from './modelManager';
-import { bytesToPCM16, pcm16ToBytes, resamplePCM16, rmsLevel } from './resample';
+import { bytesToPCM16, rmsLevel } from './resample';
 
-// The QVAC ASR models expect 16kHz; the recorder captures at this standard hardware
-// rate instead (44.1kHz caused no native failures in testing, whereas requesting 16kHz
-// directly from the recorder threw an unlocalized native error on-device — see the
-// resample() call below for the downsampling this trades in for reliability).
-const CAPTURE_SAMPLE_RATE = 44100;
-const TARGET_SAMPLE_RATE = 16000;
+const SAMPLE_RATE = 16000;
 
 /**
- * Push-to-talk voice capture: loads Parakeet TDT v3 (multilingual, es/pt/en — see the
- * architecture plan), opens a duplex transcribeStream() session, and feeds it 16kHz mono
- * float32 chunks from the microphone as they arrive. `partialText` updates live so the UI
- * can show transcription as it happens; `stop()` closes the mic and the session and
- * resolves with the final transcript.
+ * Push-to-talk voice capture: records to a WAV file, then transcribes the whole clip in
+ * one call once the user stops — record and transcribe as two separate phases, not a live
+ * streaming session. The streaming duplex API (transcribeStream + session.write() per
+ * audio chunk) worked, but stopping mid-utterance raced the QVAC worker's RPC channel
+ * teardown against in-flight writes and crashed with an uncaught 'CHANNEL_CLOSED' error
+ * from bare-rpc that no JS try/catch could intercept (it fires from the stream's internal
+ * 'error' event, not a rejected promise). Two clean request/response calls — record, then
+ * transcribe — has no such race and was already proven reliable in the phase-0 spike.
+ * `audioLevel` still updates live from the raw mic signal so the UI can show a waveform
+ * while recording, independent of transcription (which now only starts after `stop()`).
  */
 export function useVoiceCapture() {
   const { startRecording, stopRecording } = useAudioRecorder();
   const [isRecording, setIsRecording] = useState(false);
   const [isLoadingModel, setIsLoadingModel] = useState(false);
-  const [partialText, setPartialText] = useState('');
-  const [audioLevel, setAudioLevel] = useState(0); // 0-1, updates every audio chunk (~100-300ms) —
-  // independent of the ASR's slower partial-text cadence, so the UI can stay visibly "alive"
-  // during the 1-3s gaps between transcript updates instead of looking frozen/laggy.
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [audioLevel, setAudioLevel] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  const sessionRef = useRef<TranscribeStreamSession | null>(null);
-  const drainPromiseRef = useRef<Promise<void> | null>(null);
-  const textRef = useRef('');
   const busyRef = useRef(false); // guards against a double-tap firing start() twice
-
-  // Shared by stop() and start()'s failure path — a session or model left open when
-  // something fails mid-start blocks every subsequent attempt with "concurrent
-  // runStreaming() during an open streaming session", since the QVAC worker only allows
-  // one active streaming session per model.
-  const cleanup = useCallback(async () => {
-    const session = sessionRef.current;
-    if (session) {
-      try {
-        session.end();
-      } catch {
-        // already ended
-      }
-      await drainPromiseRef.current?.catch(() => {});
-      sessionRef.current = null;
-      drainPromiseRef.current = null;
-    }
-    await unloadCurrentModel();
-  }, []);
 
   const start = useCallback(async () => {
     if (busyRef.current) return;
     busyRef.current = true;
     setError(null);
-    setPartialText('');
     setAudioLevel(0);
-    textRef.current = '';
-    setIsLoadingModel(true);
-    // Every previous fix attempt (audio format, sample rate, streaming:true) produced
-    // the byte-for-byte identical native error, which means guessing which awaited call
-    // actually threw was unreliable — instrument each step so the error message itself
-    // says which one failed instead of continuing to guess blind.
     let step = 'PERMISSION';
     try {
       const permission = await AudioStudioModule.requestPermissionsAsync();
@@ -74,72 +43,56 @@ export function useVoiceCapture() {
         );
       }
 
-      step = 'LOAD_MODEL';
-      const modelId = await loadExclusive({
-        modelSrc: PARAKEET_TDT_0_6B_V3_Q4_0,
-        modelType: 'parakeet-transcription',
-        modelConfig: {
-          streaming: true,
-          streamingEmitPartials: true,
-          // Default encoder cadence is 2000ms — that's the 1-3s gap between transcript
-          // updates. Shorter chunks trade a little transcription context for a
-          // noticeably snappier feel; 800ms is still enough audio per chunk for Parakeet
-          // to transcribe accurately at conversational speech rates.
-          streamingChunkMs: 800,
-        },
-      });
-      setIsLoadingModel(false);
-
-      step = 'OPEN_STREAM';
-      const session = (await transcribeStream({ modelId })) as TranscribeStreamSession;
-      sessionRef.current = session;
-
-      step = 'DRAIN_LOOP_SETUP';
-      drainPromiseRef.current = (async () => {
-        for await (const chunk of session) {
-          const text = typeof chunk === 'string' ? chunk : (chunk as { text?: string }).text ?? '';
-          if (text) {
-            textRef.current += text;
-            setPartialText(textRef.current);
-          }
-        }
-      })();
-
       step = 'START_RECORDING';
       await startRecording({
-        sampleRate: CAPTURE_SAMPLE_RATE,
+        sampleRate: SAMPLE_RATE,
         channels: 1,
         encoding: 'pcm_16bit',
         onAudioStream: async (event: { data: string | Float32Array | Int16Array }) => {
           if (typeof event.data !== 'string') return; // native hands back base64 PCM16LE
-          const captured = bytesToPCM16(toByteArray(event.data));
-          setAudioLevel(rmsLevel(captured));
-          const resampled = resamplePCM16(captured, CAPTURE_SAMPLE_RATE, TARGET_SAMPLE_RATE);
-          session.write(pcm16ToBytes(resampled));
+          setAudioLevel(rmsLevel(bytesToPCM16(toByteArray(event.data))));
         },
       });
       setIsRecording(true);
     } catch (e: any) {
-      console.error(`[voice] start failed at step ${step}:`, e, e?.stack);
-      setIsLoadingModel(false);
-      setError(`[${step}] ` + (e?.message || e?.code || JSON.stringify(e) || 'Error desconocido'));
-      await cleanup();
+      console.error(`[voice] start failed at step ${step}:`, e);
+      setError(`[${step}] ` + (e?.message || e?.code || 'Error desconocido al iniciar la grabación'));
     } finally {
       busyRef.current = false;
     }
-  }, [startRecording, cleanup]);
+  }, [startRecording]);
 
   const stop = useCallback(async (): Promise<string> => {
     setIsRecording(false);
     setAudioLevel(0);
+    let step = 'STOP_RECORDING';
+    let modelId: string | null = null;
     try {
-      await stopRecording();
-    } catch {
-      // recorder may already be stopped; ignore
-    }
-    await cleanup();
-    return textRef.current;
-  }, [stopRecording, cleanup]);
+      const result = await stopRecording();
+      const filePath = result.fileUri.replace(/^file:\/\//, '');
 
-  return { isRecording, isLoadingModel, partialText, audioLevel, error, start, stop };
+      step = 'LOAD_MODEL';
+      setIsLoadingModel(true);
+      modelId = await loadExclusive({
+        modelSrc: PARAKEET_TDT_0_6B_V3_Q4_0,
+        modelType: 'parakeet-transcription',
+      });
+      setIsLoadingModel(false);
+
+      step = 'TRANSCRIBE';
+      setIsTranscribing(true);
+      const text = await transcribe({ modelId, audioChunk: filePath });
+      return text.trim();
+    } catch (e: any) {
+      console.error(`[voice] stop failed at step ${step}:`, e);
+      setError(`[${step}] ` + (e?.message || e?.code || 'Error desconocido al transcribir'));
+      return '';
+    } finally {
+      setIsLoadingModel(false);
+      setIsTranscribing(false);
+      await unloadCurrentModel().catch(() => {});
+    }
+  }, [stopRecording]);
+
+  return { isRecording, isLoadingModel, isTranscribing, audioLevel, error, start, stop };
 }

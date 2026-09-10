@@ -145,18 +145,18 @@ export default function CaptureScreen() {
         {screen === 'input' && (
           <>
             {voice.isRecording ? (
-              <View className="bg-neutral-900 rounded-xl p-4 min-h-32">
-                <View className="flex-row items-center justify-between mb-3">
-                  <View className="flex-row items-center">
-                    <View className="w-2 h-2 rounded-full bg-red-500 mr-2" />
-                    <Text className="text-red-400 text-xs font-medium">Grabando…</Text>
-                  </View>
-                  <View className="flex-1 ml-4">
-                    <Waveform level={voice.audioLevel} />
-                  </View>
+              <View className="bg-neutral-900 rounded-xl p-4 min-h-32 justify-center">
+                <View className="flex-row items-center mb-3">
+                  <View className="w-2 h-2 rounded-full bg-red-500 mr-2" />
+                  <Text className="text-red-400 text-xs font-medium">Grabando… habla ahora</Text>
                 </View>
-                <Text className="text-white text-base">
-                  {voice.partialText || 'Escuchando…'}
+                <Waveform level={voice.audioLevel} />
+              </View>
+            ) : voice.isLoadingModel || voice.isTranscribing ? (
+              <View className="bg-neutral-900 rounded-xl p-4 min-h-32 items-center justify-center">
+                <ActivityIndicator color="#fff" />
+                <Text className="text-neutral-400 mt-3 text-sm">
+                  {voice.isLoadingModel ? 'Cargando modelo de voz…' : 'Transcribiendo…'}
                 </Text>
               </View>
             ) : (
@@ -176,24 +176,22 @@ export default function CaptureScreen() {
 
             <Pressable
               onPress={handleToggleVoice}
-              disabled={voice.isLoadingModel}
+              disabled={voice.isLoadingModel || voice.isTranscribing}
               className={`mt-3 rounded-xl py-3 items-center flex-row justify-center gap-2 ${
                 voice.isRecording ? 'bg-red-600' : 'bg-neutral-800'
               }`}>
-              {voice.isLoadingModel ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text className="text-white font-semibold">
-                  {voice.isRecording ? '⏹  Detener y transcribir' : '🎙️  Dictar observación'}
-                </Text>
-              )}
+              <Text className="text-white font-semibold">
+                {voice.isRecording ? '⏹  Detener y transcribir' : '🎙️  Dictar observación'}
+              </Text>
             </Pressable>
 
             {(error || voice.error) && <Text className="text-red-400 mt-3">{error ?? voice.error}</Text>}
             <Pressable
               onPress={handleExtract}
-              disabled={!text.trim() || voice.isRecording}
-              className={`mt-3 rounded-xl py-3 items-center ${text.trim() && !voice.isRecording ? 'bg-blue-600' : 'bg-neutral-800'}`}>
+              disabled={!text.trim() || voice.isRecording || voice.isTranscribing}
+              className={`mt-3 rounded-xl py-3 items-center ${
+                text.trim() && !voice.isRecording && !voice.isTranscribing ? 'bg-blue-600' : 'bg-neutral-800'
+              }`}>
               <Text className="text-white font-semibold">Extraer información</Text>
             </Pressable>
           </>
