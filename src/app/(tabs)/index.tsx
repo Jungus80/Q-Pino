@@ -1,15 +1,29 @@
 import { normalizeObservation } from '@/core/normalize/pipeline';
+import { computeNextQuestion } from '@/core/followup/nextQuestion';
 import type { ExtractedObservation, Modality, NormalizedEquipment, NormalizedInstitution } from '@/core/schema/observation';
 import { MODALITIES } from '@/core/schema/observation';
 import { saveObservation } from '@/db/saveObservation';
+import { matchInstitution } from '@/db/repos/institutions';
 import { extractObservation } from '@/ai/extract';
 import { useVoiceCapture } from '@/ai/asr';
 import { useObserverName } from '@/hooks/use-observer-name';
 import { StatusChip, cycleStatus } from '@/components/StatusChip';
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+/** Promisified 3-way Alert — used for the institution merge confirmation, where the
+ * caller needs to actually await the user's choice before deciding how to save. */
+function confirmAsync(title: string, message: string, confirmLabel: string, cancelLabel: string): Promise<boolean | null> {
+  return new Promise((resolve) => {
+    Alert.alert(title, message, [
+      { text: 'Cancelar', style: 'cancel', onPress: () => resolve(null) },
+      { text: cancelLabel, onPress: () => resolve(false) },
+      { text: confirmLabel, onPress: () => resolve(true) },
+    ]);
+  });
+}
 
 type Screen = 'input' | 'extracting' | 'review' | 'saving';
 
@@ -103,10 +117,33 @@ export default function CaptureScreen() {
     setEquipment((prev) => prev.map((eq, i) => (i === index ? { ...eq, ...patch } : eq)));
   }
 
+  const followUp = useMemo(() => computeNextQuestion(equipment), [equipment]);
+
   async function handleSave() {
     if (!extraction || !institution) return;
     setScreen('saving');
     try {
+      // The 'ask' band (0.75-0.92 name similarity) is plausible-but-not-certain — rather
+      // than silently create a duplicate client or silently merge into the wrong one,
+      // confirm with the user before saving.
+      let forceInstitutionId: string | undefined;
+      if (institution.name) {
+        const match = await matchInstitution({ name: institution.name, city: institution.city, countryIso: institution.countryIso });
+        if (match.kind === 'ask') {
+          const choice = await confirmAsync(
+            '¿Es el mismo cliente?',
+            `"${institution.name}" se parece a "${match.institution.name}"${match.institution.city ? ` (${match.institution.city})` : ''} — ¿son el mismo cliente?`,
+            'Sí, es el mismo',
+            'No, es nuevo'
+          );
+          if (choice == null) {
+            setScreen('review');
+            return; // cancelled — let the user re-check the name before deciding
+          }
+          if (choice) forceInstitutionId = match.institution.id;
+        }
+      }
+
       const result = await saveObservation({
         rawText: text.trim(),
         transcript: text.trim(),
@@ -116,6 +153,7 @@ export default function CaptureScreen() {
         institution,
         equipment,
         observerId: observer.name,
+        forceInstitutionId,
       });
       setText('');
       setSource('text');
@@ -234,6 +272,13 @@ export default function CaptureScreen() {
               />
             </View>
 
+            {followUp && (
+              <View className="bg-blue-950 border border-blue-800 rounded-xl p-3 mb-4">
+                <Text className="text-blue-300 text-xs uppercase mb-1">💡 Dato más valioso para completar</Text>
+                <Text className="text-white text-sm">{followUp.question}</Text>
+              </View>
+            )}
+
             <Text className="text-neutral-500 text-xs uppercase mb-2">
               Equipos ({equipment.length})
             </Text>
@@ -282,15 +327,22 @@ export default function CaptureScreen() {
                 </View>
 
                 <View className="flex-row items-center gap-2">
-                  <Text className="text-neutral-400 flex-1">
-                    {eq.installYearLo != null
-                      ? eq.installYearLo === eq.installYearHi
-                        ? `Instalado en ${eq.installYearLo}`
-                        : `Instalado entre ${eq.installYearLo}–${eq.installYearHi}`
-                      : 'Antigüedad desconocida'}
-                  </Text>
+                  <TextInput
+                    value={eq.installYearLo != null ? String(eq.installYearLo) : ''}
+                    onChangeText={(v) => {
+                      const year = v ? parseInt(v, 10) || null : null;
+                      updateEquipment(i, { installYearLo: year, installYearHi: year });
+                    }}
+                    placeholder="Año de instalación"
+                    placeholderTextColor="#71717a"
+                    keyboardType="number-pad"
+                    className="bg-neutral-800 text-white rounded-lg px-3 py-2 flex-1"
+                  />
                   <StatusChip status={eq.fieldStatus.age} onPress={() => updateEquipment(i, { fieldStatus: { ...eq.fieldStatus, age: cycleStatus(eq.fieldStatus.age) } })} />
                 </View>
+                {eq.installYearLo != null && eq.installYearHi != null && eq.installYearLo !== eq.installYearHi && (
+                  <Text className="text-neutral-500 text-xs mt-1">Rango estimado original: {eq.installYearLo}–{eq.installYearHi}</Text>
+                )}
               </View>
             ))}
 

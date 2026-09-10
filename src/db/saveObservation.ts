@@ -30,6 +30,10 @@ export type SaveObservationInput = {
   institution: NormalizedInstitution;
   equipment: NormalizedEquipment[];
   observerId?: string;
+  /** Set when the caller already resolved an 'ask'-band institution match via its own
+   * confirmation UI (see the capture screen) — attaches to this institution directly
+   * instead of re-running matchInstitution(). */
+  forceInstitutionId?: string;
 };
 
 export type EquipmentOutcome =
@@ -43,7 +47,7 @@ export type SaveObservationResult = {
   observationId: string;
   institutionId: string;
   institutionCreated: boolean;
-  institutionMatchKind: 'auto_merge' | 'ask' | 'new';
+  institutionMatchKind: 'auto_merge' | 'ask' | 'new' | 'confirmed';
   equipment: EquipmentOutcome[];
 };
 
@@ -126,33 +130,40 @@ export async function saveObservation(input: SaveObservationInput): Promise<Save
 
   let institutionId: string;
   let institutionCreated = false;
+  let matchKind: SaveObservationResult['institutionMatchKind'];
 
-  const match =
-    input.institution.name != null
-      ? await matchInstitution({
-          name: input.institution.name,
-          city: input.institution.city,
-          countryIso: input.institution.countryIso,
-        })
-      : { kind: 'new' as const };
-
-  if (match.kind === 'auto_merge') {
-    institutionId = match.institution.id;
+  if (input.forceInstitutionId) {
+    institutionId = input.forceInstitutionId;
+    matchKind = 'confirmed';
   } else {
-    // 'ask'-band matches fall through to creating a new institution — there is no
-    // interactive "¿es el mismo que X?" confirmation UI yet (src/db/repos/institutions.ts
-    // still exposes the match so that UI can be added without touching this logic).
-    institutionId = newId('inst');
-    institutionCreated = true;
-    await insertInstitution({
-      id: institutionId,
-      name: input.institution.name ?? 'Cliente sin nombre',
-      site: input.institution.site,
-      city: input.institution.city,
-      countryIso: input.institution.countryIso,
-      region: input.institution.region,
-      createdAt: now,
-    });
+    const match =
+      input.institution.name != null
+        ? await matchInstitution({
+            name: input.institution.name,
+            city: input.institution.city,
+            countryIso: input.institution.countryIso,
+          })
+        : { kind: 'new' as const };
+    matchKind = match.kind;
+
+    if (match.kind === 'auto_merge') {
+      institutionId = match.institution.id;
+    } else {
+      // 'ask'-band matches land here when the caller didn't resolve them via
+      // forceInstitutionId (e.g. the confirmation UI was skipped or the user said "no,
+      // it's a new client") — falls through to creating a new institution.
+      institutionId = newId('inst');
+      institutionCreated = true;
+      await insertInstitution({
+        id: institutionId,
+        name: input.institution.name ?? 'Cliente sin nombre',
+        site: input.institution.site,
+        city: input.institution.city,
+        countryIso: input.institution.countryIso,
+        region: input.institution.region,
+        createdAt: now,
+      });
+    }
   }
 
   const base = { observationId, observerId, observedAt: now };
@@ -357,7 +368,7 @@ export async function saveObservation(input: SaveObservationInput): Promise<Save
     observationId,
     institutionId,
     institutionCreated,
-    institutionMatchKind: match.kind,
+    institutionMatchKind: matchKind,
     equipment: outcomes,
   };
 }
