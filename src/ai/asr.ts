@@ -22,8 +22,30 @@ export function useVoiceCapture() {
   const sessionRef = useRef<TranscribeStreamSession | null>(null);
   const drainPromiseRef = useRef<Promise<void> | null>(null);
   const textRef = useRef('');
+  const busyRef = useRef(false); // guards against a double-tap firing start() twice
+
+  // Shared by stop() and start()'s failure path — a session or model left open when
+  // something fails mid-start blocks every subsequent attempt with "concurrent
+  // runStreaming() during an open streaming session", since the QVAC worker only allows
+  // one active streaming session per model.
+  const cleanup = useCallback(async () => {
+    const session = sessionRef.current;
+    if (session) {
+      try {
+        session.end();
+      } catch {
+        // already ended
+      }
+      await drainPromiseRef.current?.catch(() => {});
+      sessionRef.current = null;
+      drainPromiseRef.current = null;
+    }
+    await unloadCurrentModel();
+  }, []);
 
   const start = useCallback(async () => {
+    if (busyRef.current) return;
+    busyRef.current = true;
     setError(null);
     setPartialText('');
     textRef.current = '';
@@ -64,10 +86,14 @@ export function useVoiceCapture() {
       });
       setIsRecording(true);
     } catch (e: any) {
+      console.error('[voice] start failed:', e);
       setIsLoadingModel(false);
-      setError(e?.message ?? String(e));
+      setError(e?.message || e?.code || JSON.stringify(e) || 'Error desconocido al iniciar la grabación');
+      await cleanup();
+    } finally {
+      busyRef.current = false;
     }
-  }, [startRecording]);
+  }, [startRecording, cleanup]);
 
   const stop = useCallback(async (): Promise<string> => {
     setIsRecording(false);
@@ -76,17 +102,9 @@ export function useVoiceCapture() {
     } catch {
       // recorder may already be stopped; ignore
     }
-
-    const session = sessionRef.current;
-    if (session) {
-      session.end();
-      await drainPromiseRef.current?.catch(() => {});
-      sessionRef.current = null;
-      drainPromiseRef.current = null;
-    }
-    await unloadCurrentModel();
+    await cleanup();
     return textRef.current;
-  }, [stopRecording]);
+  }, [stopRecording, cleanup]);
 
   return { isRecording, isLoadingModel, partialText, error, start, stop };
 }
