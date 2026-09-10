@@ -4,6 +4,7 @@ import { toByteArray } from 'base64-js';
 import { useCallback, useRef, useState } from 'react';
 import { loadExclusive, unloadCurrentModel } from './modelManager';
 import { bytesToPCM16, rmsLevel } from './resample';
+import { WHISPER_VOCABULARY_PROMPT } from './prompts/whisperPrompt';
 
 const SAMPLE_RATE = 16000;
 
@@ -109,7 +110,7 @@ export function useVoiceCapture() {
 
       step = 'TRANSCRIBE';
       setIsTranscribing(true);
-      const text = await transcribe({ modelId, audioChunk: filePath });
+      const text = await transcribe({ modelId, audioChunk: filePath, prompt: WHISPER_VOCABULARY_PROMPT });
       return text.trim();
     } catch (e: any) {
       console.error(`[voice] stop failed at step ${step}:`, e);
