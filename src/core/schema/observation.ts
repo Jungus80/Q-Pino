@@ -21,24 +21,32 @@ export type FieldStatus = (typeof FIELD_STATUSES)[number];
 export const fieldStatusSchema = z.enum(FIELD_STATUSES);
 export const modalitySchema = z.enum(MODALITIES);
 
-// QVAC's json_schema grammar leaves genuinely-optional fields out of `required` instead
-// of using a `[X, 'null']` nullable union (see src/core/schema/jsonSchemas.ts for why) —
-// so the model may omit these keys entirely. `.nullable().default(null)` accepts both an
-// omitted key and an explicit `null`, normalizing either to `null` without widening the
-// inferred TS type to include `undefined`.
-const optionalString = () => z.string().nullable().default(null);
+// Every field the LLM extracts is `required` in the JSON Schema the grammar is compiled
+// from (see src/core/schema/jsonSchemas.ts) — a small model under grammar constraint was
+// found to skip merely-*optional* keys even when the value was clearly present in the
+// text. "Unknown" is instead signaled with a sentinel the model must actively write:
+// `""` for strings, `-1` for numbers. These helpers turn the sentinel back into `null`
+// once parsed, so nothing downstream (normalization, DB, UI) needs to know it existed.
+const sentinelString = () => z.string().transform((v) => (v.trim().length === 0 ? null : v));
+
+const sentinelNumber = (min: number, max: number, integer = false) => {
+  const base = integer ? z.number().int() : z.number();
+  return base
+    .refine((v) => v === -1 || (v >= min && v <= max), { message: `must be -1 (unknown) or between ${min} and ${max}` })
+    .transform((v) => (v === -1 ? null : v));
+};
 
 /** One piece of equipment as extracted from a single observation, before normalization. */
 export const extractedEquipmentSchema = z.object({
   modality: modalitySchema,
-  count: z.number().int().min(0).max(200).nullable().default(null),
-  manufacturer: optionalString(),
-  model: optionalString(),
-  ageYearsMin: z.number().min(0).max(60).nullable().default(null),
-  ageYearsMax: z.number().min(0).max(60).nullable().default(null),
-  installYear: z.number().int().min(1970).max(2100).nullable().default(null),
-  serial: optionalString(),
-  whichUnit: optionalString(),
+  count: sentinelNumber(0, 200, true),
+  manufacturer: sentinelString(),
+  model: sentinelString(),
+  ageYearsMin: sentinelNumber(0, 60),
+  ageYearsMax: sentinelNumber(0, 60),
+  installYear: sentinelNumber(1970, 2100, true),
+  serial: sentinelString(),
+  whichUnit: sentinelString(),
   fieldStatus: z.object({
     manufacturer: fieldStatusSchema,
     model: fieldStatusSchema,
@@ -52,14 +60,14 @@ export type ExtractedEquipment = z.infer<typeof extractedEquipmentSchema>;
 /** The full structured payload the LLM must produce for one observation. */
 export const extractedObservationSchema = z.object({
   institution: z.object({
-    name: optionalString(),
-    site: optionalString(),
-    city: optionalString(),
-    country: optionalString(),
+    name: sentinelString(),
+    site: sentinelString(),
+    city: sentinelString(),
+    country: sentinelString(),
     evidence: z.array(z.string()),
   }),
   equipment: z.array(extractedEquipmentSchema),
-  comments: optionalString(),
+  comments: sentinelString(),
   missing: z.array(z.string()),
 });
 export type ExtractedObservation = z.infer<typeof extractedObservationSchema>;

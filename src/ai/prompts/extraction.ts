@@ -9,7 +9,7 @@ El texto puede estar en español, portugués o inglés. Puede mezclar varios equ
 
 Reglas:
 - No inventes nada. Cada dato que reportes (manufacturer, model, serial, count, edad) debe venir literalmente del texto — copia el fragmento exacto en "evidence".
-- Si un dato no se menciona, no lo incluyas (deja el campo fuera del objeto).
+- Todos los campos son obligatorios en el JSON, pero eso NO significa que tengas que inventar datos: si algo no se menciona en el texto, escribe "" (string vacío) para campos de texto o -1 para campos numéricos — nunca omitas la clave ni inventes un valor. Revisa cada campo uno por uno antes de responder; es un error común dejar "" o -1 en un campo cuyo valor SÍ aparece claramente en el texto (por ejemplo el nombre del hospital, o "dos" cuando se menciona una cantidad).
 - "modality" es obligatorio para cada equipo: usa MR (resonador/ressonância/MRI), CT (tomógrafo/tomografia/CT), US (ecógrafo/ultrassom/ultrasound), XR (rayos X/raio-x), MG (mamógrafo/mammography), PET_CT, SPECT, NM (medicina nuclear), ANGIO, MONITORING (monitores de signos vitales), o OTHER.
 - "fieldStatus" para cada campo (manufacturer, model, age, count) usa: Confirmado (el colaborador vio una placa/etiqueta o verificó explícitamente), Reportado (lo afirma como hecho, sin cautela), Estimado (usa palabras como "parece", "unos", "aproximadamente", "creo"), o Desconocido (no se menciona).
 - Si el colaborador dice "tienen dos resonadores" sin más detalle, igual crea una entrada de equipment con modality MR y count 2 — no la omitas solo porque falte manufacturer/model.

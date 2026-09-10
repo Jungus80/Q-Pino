@@ -4,42 +4,58 @@
 // mirror of src/core/schema/observation.ts but in raw JSON Schema form (not zod), since
 // that's what the QVAC completion API expects on the wire.
 //
-// Two llama.cpp grammar-engine quirks shaped this file (found via the phase-0 device
-// spike, see git history):
+// Three llama.cpp/small-model quirks shaped this file (found via the phase-0 device spike
+// and on-device extraction testing, see git history):
 //  1. `type: [X, 'null']` (nullable unions) hits known bugs in json-schema-to-grammar.cpp
-//     (empty required+optional short-circuit, minLength/maxLength clamping). We never use
-//     that pattern here — a field that may be unknown is simply omitted from `required`
-//     instead of made nullable. src/core/schema/observation.ts fills in `null` for any
-//     field the model leaves out.
-//  2. Structural fields (the ones that give the payload its shape: `modality`,
-//     `fieldStatus`, `evidence`, ...) stay in `required` so the model can't omit the
-//     skeleton — only genuinely-optional *values* are left out of `required`.
-//
-// Also load the model with `modelConfig: { reasoning_budget: 0 }` — Qwen3.5 thinks by
-// default, and its reasoning-channel tokens aren't part of this grammar's root, which
-// crashes the grammar sampler ("Unexpected empty grammar stack") the moment it tries to
-// emit one.
+//     (empty required+optional short-circuit, minLength/maxLength clamping). Never used
+//     here — every field is a plain single type.
+//  2. Making fields merely *optional* (out of `required`) let QWEN3_5_2B skip filling in
+//     values that were clearly present in the input text — a 2B model under grammar
+//     constraint takes the path of least resistance, and omitting an optional key is
+//     cheaper than extracting it. So every field is `required`, but uses a sentinel value
+//     instead of an omitted key or `null` when unknown: `""` for strings, `-1` for
+//     numbers. This forces the model to actively decide something for each field rather
+//     than skip it — src/core/schema/observation.ts's zod schema converts the sentinels
+//     back to `null` on the way out, so nothing downstream needs to know about them.
+//  3. Load the model with `modelConfig: { reasoning_budget: 0 }` — Qwen3.5 thinks by
+//     default, and its reasoning-channel tokens aren't part of this grammar's root, which
+//     crashes the grammar sampler ("Unexpected empty grammar stack") the moment it tries
+//     to emit one.
 
 import { MODALITIES } from './observation';
 
 const FIELD_STATUS_ENUM = ['Confirmado', 'Reportado', 'Estimado', 'Desconocido'] as const;
+const UNKNOWN_STRING_NOTE = 'Use "" (empty string) if not mentioned in the text — never omit this key.';
+const UNKNOWN_NUMBER_NOTE = 'Use -1 if not mentioned in the text — never omit this key.';
 
 const equipmentItemSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['modality', 'fieldStatus', 'evidence'],
+  required: [
+    'modality',
+    'count',
+    'manufacturer',
+    'model',
+    'ageYearsMin',
+    'ageYearsMax',
+    'installYear',
+    'serial',
+    'whichUnit',
+    'fieldStatus',
+    'evidence',
+  ],
   properties: {
     modality: { type: 'string', enum: [...MODALITIES] },
-    count: { type: 'integer' },
-    manufacturer: { type: 'string' },
-    model: { type: 'string' },
-    ageYearsMin: { type: 'number' },
-    ageYearsMax: { type: 'number' },
-    installYear: { type: 'integer' },
-    serial: { type: 'string' },
+    count: { type: 'integer', description: UNKNOWN_NUMBER_NOTE },
+    manufacturer: { type: 'string', description: UNKNOWN_STRING_NOTE },
+    model: { type: 'string', description: UNKNOWN_STRING_NOTE },
+    ageYearsMin: { type: 'number', description: UNKNOWN_NUMBER_NOTE },
+    ageYearsMax: { type: 'number', description: UNKNOWN_NUMBER_NOTE },
+    installYear: { type: 'integer', description: UNKNOWN_NUMBER_NOTE },
+    serial: { type: 'string', description: UNKNOWN_STRING_NOTE },
     whichUnit: {
       type: 'string',
-      description: 'Which unit(s) this claim refers to, e.g. "one of the MR systems".',
+      description: `Which unit(s) this claim refers to, e.g. "one of the MR systems". ${UNKNOWN_STRING_NOTE}`,
     },
     fieldStatus: {
       type: 'object',
@@ -65,22 +81,22 @@ export const OBSERVATION_EXTRACTION_SCHEMA = {
   schema: {
     type: 'object',
     additionalProperties: false,
-    required: ['institution', 'equipment', 'missing'],
+    required: ['institution', 'equipment', 'comments', 'missing'],
     properties: {
       institution: {
         type: 'object',
         additionalProperties: false,
-        required: ['evidence'],
+        required: ['name', 'site', 'city', 'country', 'evidence'],
         properties: {
-          name: { type: 'string' },
-          site: { type: 'string', description: 'Building, floor, or department, if mentioned.' },
-          city: { type: 'string' },
-          country: { type: 'string' },
+          name: { type: 'string', description: UNKNOWN_STRING_NOTE },
+          site: { type: 'string', description: `Building, floor, or department, if mentioned. ${UNKNOWN_STRING_NOTE}` },
+          city: { type: 'string', description: UNKNOWN_STRING_NOTE },
+          country: { type: 'string', description: UNKNOWN_STRING_NOTE },
           evidence: { type: 'array', items: { type: 'string' } },
         },
       },
       equipment: { type: 'array', items: equipmentItemSchema },
-      comments: { type: 'string' },
+      comments: { type: 'string', description: UNKNOWN_STRING_NOTE },
       missing: {
         type: 'array',
         items: { type: 'string' },
