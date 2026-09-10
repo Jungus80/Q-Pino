@@ -36,7 +36,27 @@ describe('sanitizeQueryDsl', () => {
   });
 
   it('is a no-op on an already-clean DSL', () => {
-    const dsl: QueryDsl = { ...EMPTY_QUERY_DSL, country: ['BR'], groupBy: 'country', metric: 'confidence' };
+    const dsl: QueryDsl = { ...EMPTY_QUERY_DSL, country: ['BR'], metric: 'count' };
     expect(sanitizeQueryDsl(dsl)).toEqual(dsl);
+  });
+
+  it('drops a country filter that matches its own groupBy — regression for "de qué países tenemos clientes"', () => {
+    const dsl: QueryDsl = { ...EMPTY_QUERY_DSL, country: ['BR'], groupBy: 'country' };
+    expect(sanitizeQueryDsl(dsl).country).toEqual([]);
+  });
+
+  it('drops a city filter that matches its own groupBy', () => {
+    const dsl: QueryDsl = { ...EMPTY_QUERY_DSL, city: ['São Paulo'], groupBy: 'city' };
+    expect(sanitizeQueryDsl(dsl).city).toEqual([]);
+  });
+
+  it('drops a manufacturer filter that matches its own groupBy', () => {
+    const dsl: QueryDsl = { ...EMPTY_QUERY_DSL, manufacturer: ['Solara Health'], groupBy: 'manufacturer' };
+    expect(sanitizeQueryDsl(dsl).manufacturer).toEqual([]);
+  });
+
+  it('leaves a country filter untouched when groupBy targets a different field', () => {
+    const dsl: QueryDsl = { ...EMPTY_QUERY_DSL, country: ['BR'], groupBy: 'modality' };
+    expect(sanitizeQueryDsl(dsl).country).toEqual(['BR']);
   });
 });

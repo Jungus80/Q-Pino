@@ -51,13 +51,20 @@ export function describeQueryDsl(dsl: QueryDsl): string[] {
 /**
  * Defensive cleanup for a QueryDsl the LLM just produced. A 2B model under grammar
  * constraint sometimes "fills in" a field instead of leaving it empty when it isn't sure
- * — the same failure mode extraction had, and observed live for query parsing: "Equipos
- * por modalidad" (a request to group by modality, no filter) came back with every single
- * modality value listed instead of an empty array plus groupBy. The prompt's few-shot
- * examples target this directly, but a second, deterministic safety net catches whatever
- * slips through:
+ * — the same failure mode extraction had, and observed live twice for query parsing:
+ * "Equipos por modalidad" came back with every single modality value listed instead of an
+ * empty array plus groupBy, and "De qué países tenemos clientes" (asking for a breakdown
+ * across ALL countries) came back with country: ["BR"] — silently narrowing a "give me
+ * everything, broken down" question down to one country's worth of data, invisibly wrong
+ * rather than an obvious failure. The prompt's few-shot examples target this directly, but
+ * a second, deterministic safety net catches whatever slips through:
  *  - listing every modality is indistinguishable from "no filter" (an IN clause matching
  *    every row), so collapse it to [] rather than waste the join and mislead the chip UI.
+ *  - groupBy on a field is a structural signal from an explicit prompt rule ("por país" →
+ *    groupBy: 'country') and much less prone to this failure than a filter array is; a
+ *    non-empty filter on the SAME field the model chose to group by makes the grouped
+ *    result trivially one row, which is a strong sign the filter is the hallucinated part
+ *    — drop that filter rather than silently return a narrower answer than asked.
  *  - minAge: 0 is a mathematical no-op (age is never negative) regardless of intent.
  *  - maxAge: 0 would exclude every real row (nothing installed has zero-yet age), so a
  *    hallucinated 0 is far more likely than a genuine "brand new equipment only" query —
@@ -66,6 +73,10 @@ export function describeQueryDsl(dsl: QueryDsl): string[] {
 export function sanitizeQueryDsl(dsl: QueryDsl): QueryDsl {
   const next = { ...dsl };
   if (next.modality.length === MODALITIES.length) next.modality = [];
+  if (next.groupBy === 'country' && next.country.length > 0) next.country = [];
+  if (next.groupBy === 'city' && next.city.length > 0) next.city = [];
+  if (next.groupBy === 'modality' && next.modality.length > 0) next.modality = [];
+  if (next.groupBy === 'manufacturer' && next.manufacturer.length > 0) next.manufacturer = [];
   if (next.minAge === 0) delete next.minAge;
   if (next.maxAge === 0) delete next.maxAge;
   if (next.minAge !== undefined && next.maxAge !== undefined && next.minAge > next.maxAge) {

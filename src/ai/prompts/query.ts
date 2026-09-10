@@ -9,8 +9,8 @@ La pregunta puede estar en español, portugués o inglés.
 Reglas:
 - "region", "country", "city", "manufacturer" son arrays de texto libre tal como se mencionan en la pregunta (por ejemplo country: ["Brasil"], no un código ISO) — se normalizan después con un catálogo, no hace falta que aciertes el código exacto.
 - "modality" solo acepta estos valores: MR (resonador), CT (tomógrafo), US (ecógrafo), XR (rayos X), MG (mamógrafo), PET_CT, SPECT, NM, ANGIO, MONITORING, OTHER.
-- CRÍTICO: "modality" es un FILTRO, no un tema. "Equipos por modalidad" NO significa "todas las modalidades" — significa que no hay filtro de modalidad (array vacío []) y que el desglose va en "groupBy". Poner las 11 modalidades en el array es SIEMPRE un error, incluso cuando la pregunta menciona la palabra "modalidad".
-- Deja un array vacío [] en region/country/city/modality/manufacturer cuando la pregunta no menciona ESE filtro específico — no inventes valores ni "completes" el array con todas las opciones posibles.
+- CRÍTICO: region/country/city/modality/manufacturer son FILTROS, no temas. Si la pregunta pregunta "por X" o "de qué X" o "distribución de X" (ej. "por modalidad", "de qué países", "por fabricante"), eso es un pedido de DESGLOSE — va en "groupBy", y el array de ESE MISMO campo debe quedar VACÍO []. Nunca llenes el filtro de un campo con valores (ni con "todos los posibles", ni con uno solo de ejemplo) cuando esa misma dimensión ya va en "groupBy" — filtrar y agrupar por lo mismo a la vez casi siempre está mal, porque reduce el desglose a un solo resultado trivial.
+- Deja un array vacío [] en region/country/city/modality/manufacturer cuando la pregunta no menciona ESE filtro específico con un valor concreto — no inventes valores, no "completes" el array con todas las opciones posibles, y no copies un país/ciudad/fabricante de ejemplo si la pregunta pide "todos" o "cuáles".
 - "minAge"/"maxAge" son años de antigüedad, y SOLO se incluyen si la pregunta menciona antigüedad explícitamente (por ejemplo "más de 7 años" → minAge: 7). Si la pregunta no habla de antigüedad, NO incluyas minAge ni maxAge — nunca actives estos campos "por si acaso" ni los pongas en 0.
 - "incomplete": true solo si la pregunta pide clientes con información incompleta o faltante.
 - "stale": true solo si la pregunta pide clientes desactualizados o sin verificar hace tiempo.
@@ -24,5 +24,6 @@ Ejemplos (entrada → JSON de salida):
 3. "Clientes con información incompleta" → {"region":[],"country":[],"city":[],"modality":[],"manufacturer":[],"incomplete":true,"metric":"count"}
 4. "Confianza promedio por país" → {"region":[],"country":[],"city":[],"modality":[],"manufacturer":[],"groupBy":"country","metric":"confidence"}
 5. "Tomógrafos en México" → {"region":[],"country":["México"],"city":[],"modality":["CT"],"manufacturer":[],"metric":"count"}
+6. "De qué países tenemos clientes" → {"region":[],"country":[],"city":[],"modality":[],"manufacturer":[],"groupBy":"country","metric":"count"} (SIN llenar country con ningún país — la pregunta pide TODOS)
 
 Responde solo con el JSON que pide el esquema.`;
