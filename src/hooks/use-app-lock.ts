@@ -27,6 +27,7 @@ export function useAppLock(): AppLockState {
   const [unlocking, setUnlocking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const wasBackgrounded = useRef(false);
+  const unlockingRef = useRef(false);
 
   const checkAvailability = useCallback(async () => {
     const [hasHardware, isEnrolled] = await Promise.all([
@@ -42,6 +43,7 @@ export function useAppLock(): AppLockState {
 
   const unlock = useCallback(async () => {
     setUnlocking(true);
+    unlockingRef.current = true;
     setError(null);
     try {
       const result = await LocalAuthentication.authenticateAsync({
@@ -58,6 +60,7 @@ export function useAppLock(): AppLockState {
       setError('No se pudo verificar tu identidad. Intenta de nuevo.');
     } finally {
       setUnlocking(false);
+      unlockingRef.current = false;
     }
   }, []);
 
@@ -67,7 +70,14 @@ export function useAppLock(): AppLockState {
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state: AppStateStatus) => {
-      if (state === 'background' || state === 'inactive') {
+      // Only 'background' means the app actually left the foreground (home button, app
+      // switcher, another app). 'inactive' also fires for transient system UI — control
+      // center, notifications, and critically the Face ID/Touch ID sheet itself — so
+      // treating it as "backgrounded" re-locked the app the instant authenticateAsync's
+      // own prompt closed, producing an unlock/re-lock loop. Ignoring state changes while
+      // an unlock is in flight is a second guard against the same sheet's transitions.
+      if (unlockingRef.current) return;
+      if (state === 'background') {
         wasBackgrounded.current = true;
       } else if (state === 'active' && wasBackgrounded.current) {
         wasBackgrounded.current = false;
