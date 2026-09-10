@@ -1,5 +1,6 @@
 import { transcribeStream, PARAKEET_TDT_0_6B_V3_Q4_0, type TranscribeStreamSession } from '@qvac/sdk';
 import { useAudioRecorder } from '@siteed/audio-studio';
+import { toByteArray } from 'base64-js';
 import { useCallback, useRef, useState } from 'react';
 import { loadExclusive, unloadCurrentModel } from './modelManager';
 
@@ -73,15 +74,15 @@ export function useVoiceCapture() {
       await startRecording({
         sampleRate: SAMPLE_RATE,
         channels: 1,
-        encoding: 'pcm_32bit',
-        streamFormat: 'float32',
+        // pcm_16bit + the default 'raw' streamFormat is audio-studio's most-exercised
+        // native path (its Quick Start example); pcm_32bit + streamFormat:'float32'
+        // threw an unlocalized native error on-device ("undefined reason") — likely an
+        // unsupported native audio-format conversion, not a permissions problem. QVAC's
+        // transcribeStream accepts raw s16 PCM directly, so no conversion is needed here.
+        encoding: 'pcm_16bit',
         onAudioStream: async (event: { data: string | Float32Array | Int16Array }) => {
-          // streamFormat: 'float32' guarantees a Float32Array per the audio-studio docs;
-          // the SDK's event type is still a union across every recorder config, so guard.
-          if (!(event.data instanceof Float32Array)) return;
-          const samples = event.data;
-          const bytes = new Uint8Array(samples.buffer, samples.byteOffset, samples.byteLength);
-          session.write(bytes);
+          if (typeof event.data !== 'string') return; // native hands back base64 PCM16LE
+          session.write(toByteArray(event.data));
         },
       });
       setIsRecording(true);
