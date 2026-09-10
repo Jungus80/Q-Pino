@@ -4,6 +4,7 @@ import { MODALITIES } from '@/core/schema/observation';
 import { saveObservation } from '@/db/saveObservation';
 import { extractObservation } from '@/ai/extract';
 import { useVoiceCapture } from '@/ai/asr';
+import { useObserverName } from '@/hooks/use-observer-name';
 import { StatusChip, cycleStatus } from '@/components/StatusChip';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
@@ -45,6 +46,7 @@ function Waveform({ level }: { level: number }) {
 export default function CaptureScreen() {
   const router = useRouter();
   const voice = useVoiceCapture();
+  const observer = useObserverName();
   const [screen, setScreen] = useState<Screen>('input');
   const [text, setText] = useState('');
   const [source, setSource] = useState<'text' | 'voice'>('text');
@@ -53,6 +55,11 @@ export default function CaptureScreen() {
   const [extraction, setExtraction] = useState<ExtractedObservation | null>(null);
   const [institution, setInstitution] = useState<NormalizedInstitution | null>(null);
   const [equipment, setEquipment] = useState<NormalizedEquipment[]>([]);
+
+  useEffect(() => {
+    if (!observer.loading && !observer.isSet) observer.promptForName();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [observer.loading, observer.isSet]);
 
   async function handleToggleVoice() {
     if (voice.isRecording) {
@@ -108,6 +115,7 @@ export default function CaptureScreen() {
         extraction,
         institution,
         equipment,
+        observerId: observer.name,
       });
       setText('');
       setSource('text');
@@ -125,7 +133,12 @@ export default function CaptureScreen() {
   return (
     <SafeAreaView className="flex-1 bg-neutral-950">
       <ScrollView contentContainerClassName="p-4 pb-12" keyboardShouldPersistTaps="handled">
-        <Text className="text-white text-2xl font-bold mb-1">Capturar observación</Text>
+        <View className="flex-row items-center justify-between mb-1">
+          <Text className="text-white text-2xl font-bold">Capturar observación</Text>
+          <Pressable onPress={observer.promptForName} className="flex-row items-center gap-1">
+            <Text className="text-neutral-400 text-xs">👤 {observer.name}</Text>
+          </Pressable>
+        </View>
         <Text className="text-neutral-400 mb-4">
           Escribe lo que viste en la visita, como si se lo contaras a un colega.
         </Text>

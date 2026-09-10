@@ -65,6 +65,12 @@ const MIGRATIONS: string[] = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_claims_equipment ON claims(equipment_id)`,
   `CREATE INDEX IF NOT EXISTS idx_claims_institution ON claims(institution_id)`,
+  // Tiny local key-value store — currently just the observer's own name, so every
+  // observation/claim can record "who reported it" instead of a hardcoded placeholder.
+  `CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  )`,
 ];
 
 let dbInstance: DB | null = null;
@@ -88,6 +94,7 @@ export async function resetDb(): Promise<void> {
   await db.execute('DROP TABLE IF EXISTS observations');
   await db.execute('DROP TABLE IF EXISTS equipment');
   await db.execute('DROP TABLE IF EXISTS institutions');
+  await db.execute('DROP TABLE IF EXISTS settings');
   dbInstance = null;
   await getDb();
 }

@@ -28,7 +28,7 @@ export async function insertClaims(claims: ClaimInput[]): Promise<void> {
   });
 }
 
-export type ClaimRow = ClaimInput;
+export type ClaimRow = ClaimInput & { source: 'voice' | 'text' | 'photo' };
 
 function fromRow(row: any): ClaimRow {
   return {
@@ -42,11 +42,18 @@ function fromRow(row: any): ClaimRow {
     evidence: row.evidence,
     observerId: row.observer_id,
     observedAt: row.observed_at,
+    source: row.source,
   };
 }
 
 export async function listClaimsForEquipment(equipmentId: string): Promise<ClaimRow[]> {
   const db = await getDb();
-  const res = await db.execute('SELECT * FROM claims WHERE equipment_id = ? ORDER BY observed_at', [equipmentId]);
+  const res = await db.execute(
+    `SELECT c.*, o.source AS source FROM claims c
+     JOIN observations o ON o.id = c.observation_id
+     WHERE c.equipment_id = ?
+     ORDER BY c.observed_at`,
+    [equipmentId]
+  );
   return (res.rows ?? []).map(fromRow);
 }

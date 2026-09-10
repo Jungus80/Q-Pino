@@ -1,6 +1,7 @@
 import { computeConfidence } from '@/core/score/confidence';
 import { getInstitution, type InstitutionRow } from '@/db/repos/institutions';
 import { listEquipmentForInstitution, type EquipmentRow } from '@/db/repos/equipment';
+import { listObservationsForInstitution, type ObservationRow } from '@/db/repos/observations';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
@@ -10,6 +11,12 @@ const BAND_COLOR: Record<'Alta' | 'Media' | 'Baja', string> = {
   Alta: 'bg-emerald-500',
   Media: 'bg-amber-500',
   Baja: 'bg-red-500',
+};
+
+const SOURCE_LABEL: Record<string, string> = {
+  voice: '🎙️ Voz',
+  text: '⌨️ Texto',
+  photo: '📷 Foto',
 };
 
 type ModalityGroup = {
@@ -73,13 +80,19 @@ export default function ClientDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [institution, setInstitution] = useState<InstitutionRow | null>(null);
   const [groups, setGroups] = useState<ModalityGroup[]>([]);
+  const [comments, setComments] = useState<ObservationRow[]>([]);
 
   useEffect(() => {
     (async () => {
       if (!id) return;
-      const [inst, equipment] = await Promise.all([getInstitution(id), listEquipmentForInstitution(id)]);
+      const [inst, equipment, observations] = await Promise.all([
+        getInstitution(id),
+        listEquipmentForInstitution(id),
+        listObservationsForInstitution(id),
+      ]);
       setInstitution(inst);
       setGroups(groupByModality(equipment, new Date()));
+      setComments(observations.filter((o) => o.comments));
       setLoading(false);
     })();
   }, [id]);
@@ -151,6 +164,24 @@ export default function ClientDetailScreen() {
             </View>
           </View>
         ))}
+
+        {comments.length > 0 && (
+          <>
+            <Text className="text-neutral-500 text-xs uppercase mb-2 mt-2">
+              Comentarios ({comments.length})
+            </Text>
+            {comments.map((o) => (
+              <View key={o.id} className="bg-neutral-900 rounded-lg p-3 mb-2">
+                <Text className="text-neutral-300 text-sm mb-1">{o.comments}</Text>
+                <Text className="text-neutral-600 text-xs">
+                  {new Date(o.createdAt).toLocaleDateString('es', { year: 'numeric', month: 'short', day: 'numeric' })}
+                  {' · '}
+                  {o.observerId} · {SOURCE_LABEL[o.source] ?? o.source}
+                </Text>
+              </View>
+            ))}
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

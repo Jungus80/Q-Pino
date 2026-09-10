@@ -3,6 +3,7 @@ import { getEquipmentById, type EquipmentRow } from '@/db/repos/equipment';
 import { listClaimsForEquipment, type ClaimRow } from '@/db/repos/claims';
 import { getInstitution } from '@/db/repos/institutions';
 import { saveEquipmentEdit } from '@/db/editEquipment';
+import { useObserverName } from '@/hooks/use-observer-name';
 import type { FieldStatus } from '@/core/schema/observation';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -23,9 +24,16 @@ const FIELD_LABEL: Record<string, string> = {
   unassigned_equipment_claim: 'Dato sin asignar (ambiguo)',
 };
 
+const SOURCE_LABEL: Record<string, string> = {
+  voice: '🎙️ Voz',
+  text: '⌨️ Texto',
+  photo: '📷 Foto',
+};
+
 export default function EquipmentDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const observer = useObserverName();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [equipment, setEquipment] = useState<EquipmentRow | null>(null);
@@ -82,6 +90,7 @@ export default function EquipmentDetailScreen() {
           installYearLo: yearNum,
           installYearHi: yearNum,
         },
+        observerId: observer.name,
       });
       await load();
       Alert.alert('Guardado', 'Los cambios se guardaron como una corrección confirmada.');
@@ -194,7 +203,7 @@ export default function EquipmentDetailScreen() {
             {c.value && <Text className="text-neutral-300 text-sm mb-1">{c.value}</Text>}
             {c.evidence && <Text className="text-neutral-500 text-xs italic mb-1">"{c.evidence}"</Text>}
             <Text className="text-neutral-600 text-xs">
-              {fmtDate(c.observedAt)} · {c.observerId}
+              {fmtDate(c.observedAt)} · {c.observerId} · {SOURCE_LABEL[c.source] ?? c.source}
             </Text>
           </View>
         ))}
