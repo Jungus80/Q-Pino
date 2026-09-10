@@ -1,0 +1,23 @@
+diff --git a/node_modules/@siteed/audio-studio/ios/AudioStreamManager.swift b/node_modules/@siteed/audio-studio/ios/AudioStreamManager.swift
+index b4ab6ca..dab675b 100644
+--- a/node_modules/@siteed/audio-studio/ios/AudioStreamManager.swift
++++ b/node_modules/@siteed/audio-studio/ios/AudioStreamManager.swift
+@@ -888,10 +888,14 @@ class AudioStreamManager: NSObject, AudioDeviceManagerDelegate {
+     /// We avoid CallKit because its usage prevents apps from being available in China's App Store.
+     /// This is a workaround that uses AVAudioSession to detect phone calls instead.
+     private func isPhoneCallActive() -> Bool {
+-        let audioSession = AVAudioSession.sharedInstance()
+-        return audioSession.isOtherAudioPlaying && 
+-               audioSession.secondaryAudioShouldBeSilencedHint && 
+-               audioSession.currentRoute.outputs.contains { $0.portType == .builtInReceiver }
++        // QVAC patch: this heuristic (isOtherAudioPlaying && secondaryAudioShouldBeSilencedHint
++        // && route == builtInReceiver) false-positived on-device with no call in progress,
++        // blocking every startRecording() call with "Cannot start recording during an active
++        // phone call". Genuine call interruptions are already handled correctly elsewhere via
++        // the AVAudioSession.interruptionNotification observer (pausedBySystemInterruption),
++        // which is the standard/reliable way to react to a real call — this pre-check is
++        // redundant and, per this device's behavior, unreliable. See patches/@siteed+audio-studio+*.patch.
++        return false
+     }
+ 
+     /// Installs the audio tap with the hardware-compatible format

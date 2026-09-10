@@ -45,12 +45,14 @@
     "@types/d3-geo": "^3.1.1",
     "@types/react": "~19.2.2",
     "bare-pack": "^1.5.1",
+    "patch-package": "^8.0.1",
     "tailwindcss": "^3.4.19",
     "tsx": "^4.23.13",
     "typescript": "~6.0.3",
     "vitest": "^5.0.0"
   },
   "scripts": {
+    "postinstall": "patch-package",
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
