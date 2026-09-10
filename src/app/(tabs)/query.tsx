@@ -1,4 +1,5 @@
 import { parseNaturalLanguageQuery } from '@/ai/queryParser';
+import { summarizeQueryResult } from '@/ai/querySummary';
 import { runStructuralQuery } from '@/db/repos/query';
 import { applyComputedFilters, aggregateQuery, type QueryEquipmentRow, type QueryGroup } from '@/core/query/compile';
 import type { QueryDsl } from '@/core/query/dsl';
@@ -23,12 +24,29 @@ export default function QueryScreen() {
   const [dsl, setDsl] = useState<QueryDsl | null>(null);
   const [rows, setRows] = useState<QueryEquipmentRow[]>([]);
   const [groups, setGroups] = useState<QueryGroup[] | null>(null);
+  const [summary, setSummary] = useState<string | null>(null);
+  const [summarizing, setSummarizing] = useState(false);
 
-  async function runQuery(nextDsl: QueryDsl) {
+  // The answer numbers/names are always computed deterministically first (never by the
+  // LLM) — summarizeQueryResult only phrases them in prose afterward, so a failure or
+  // slow response there is a UX nicety lost, not a correctness risk: the chips/table
+  // below stay accurate either way.
+  async function runQuery(nextDsl: QueryDsl, questionText: string) {
     const structural = await runStructuralQuery(nextDsl);
     const filtered = applyComputedFilters(structural, nextDsl);
+    const computedGroups = aggregateQuery(filtered, nextDsl);
     setRows(filtered);
-    setGroups(aggregateQuery(filtered, nextDsl));
+    setGroups(computedGroups);
+    setSummary(null);
+    setSummarizing(true);
+    try {
+      const text = await summarizeQueryResult(questionText, filtered, computedGroups);
+      setSummary(text);
+    } catch {
+      // silently skip — the structured result below still answers the question
+    } finally {
+      setSummarizing(false);
+    }
   }
 
   async function handleAsk() {
@@ -39,7 +57,7 @@ export default function QueryScreen() {
     try {
       const parsedDsl = await parseNaturalLanguageQuery(question.trim(), (p) => setProgress(p));
       setDsl(parsedDsl);
-      await runQuery(parsedDsl);
+      await runQuery(parsedDsl, question.trim());
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo interpretar la pregunta.');
     } finally {
@@ -52,7 +70,7 @@ export default function QueryScreen() {
     if (!dsl) return;
     const next: QueryDsl = { ...dsl, [key]: Array.isArray(dsl[key]) ? [] : undefined };
     setDsl(next);
-    runQuery(next);
+    runQuery(next, question.trim());
   }
 
   const chipLabels: [keyof QueryDsl, string][] = dsl
@@ -116,6 +134,19 @@ export default function QueryScreen() {
 
         {dsl && (
           <>
+            {(summary || summarizing) && (
+              <View className="bg-blue-600 rounded-xl rounded-tl-sm p-4 mb-4">
+                {summarizing ? (
+                  <View className="flex-row items-center gap-2">
+                    <ActivityIndicator color="#fff" size="small" />
+                    <Text className="text-white text-sm">Redactando respuesta…</Text>
+                  </View>
+                ) : (
+                  <Text className="text-white text-base leading-6">{summary}</Text>
+                )}
+              </View>
+            )}
+
             <Text className="text-gray-700 text-sm font-bold uppercase mb-3">Filtro Interpretado</Text>
             <View className="flex-row flex-wrap gap-2 mb-6">
               {chipLabels
