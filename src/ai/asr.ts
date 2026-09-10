@@ -3,8 +3,14 @@ import { AudioStudioModule, useAudioRecorder } from '@siteed/audio-studio';
 import { toByteArray } from 'base64-js';
 import { useCallback, useRef, useState } from 'react';
 import { loadExclusive, unloadCurrentModel } from './modelManager';
+import { bytesToPCM16, pcm16ToBytes, resamplePCM16 } from './resample';
 
-const SAMPLE_RATE = 16000;
+// The QVAC ASR models expect 16kHz; the recorder captures at this standard hardware
+// rate instead (44.1kHz caused no native failures in testing, whereas requesting 16kHz
+// directly from the recorder threw an unlocalized native error on-device — see the
+// resample() call below for the downsampling this trades in for reliability).
+const CAPTURE_SAMPLE_RATE = 44100;
+const TARGET_SAMPLE_RATE = 16000;
 
 /**
  * Push-to-talk voice capture: loads Parakeet TDT v3 (multilingual, es/pt/en — see the
@@ -83,17 +89,19 @@ export function useVoiceCapture() {
       })();
 
       await startRecording({
-        sampleRate: SAMPLE_RATE,
+        sampleRate: CAPTURE_SAMPLE_RATE,
         channels: 1,
         // pcm_16bit + the default 'raw' streamFormat is audio-studio's most-exercised
-        // native path (its Quick Start example); pcm_32bit + streamFormat:'float32'
-        // threw an unlocalized native error on-device ("undefined reason") — likely an
-        // unsupported native audio-format conversion, not a permissions problem. QVAC's
-        // transcribeStream accepts raw s16 PCM directly, so no conversion is needed here.
+        // native path (its Quick Start example). Both pcm_32bit+streamFormat:'float32'
+        // and pcm_16bit at 16kHz directly threw an unlocalized native error on-device
+        // ("undefined reason") — capturing at the standard 44.1kHz rate and downsampling
+        // in JS (below) sidesteps whatever native audio-engine path that hit.
         encoding: 'pcm_16bit',
         onAudioStream: async (event: { data: string | Float32Array | Int16Array }) => {
           if (typeof event.data !== 'string') return; // native hands back base64 PCM16LE
-          session.write(toByteArray(event.data));
+          const captured = bytesToPCM16(toByteArray(event.data));
+          const resampled = resamplePCM16(captured, CAPTURE_SAMPLE_RATE, TARGET_SAMPLE_RATE);
+          session.write(pcm16ToBytes(resampled));
         },
       });
       setIsRecording(true);
