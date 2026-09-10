@@ -43,6 +43,7 @@
   },
   "devDependencies": {
     "@types/d3-geo": "^3.1.1",
+    "@types/node": "^22.20.2",
     "@types/react": "~19.2.2",
     "bare-pack": "^1.5.1",
     "patch-package": "^8.0.1",
@@ -60,7 +61,9 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "eval:resolution": "tsx eval/runResolution.ts",
+    "typecheck:eval": "tsc --noEmit -p eval/tsconfig.json"
   },
   "private": true,
   "allowScripts": {
