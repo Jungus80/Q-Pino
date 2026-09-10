@@ -72,6 +72,16 @@ export const normalizedEquipmentSchema = extractedEquipmentSchema.extend({
 });
 export type NormalizedEquipment = z.infer<typeof normalizedEquipmentSchema>;
 
+/** The institution half of a normalized observation (geo-resolved, evidence-checked). */
+export const normalizedInstitutionSchema = z.object({
+  name: z.string().nullable(),
+  site: z.string().nullable(),
+  city: z.string().nullable(),
+  countryIso: z.string().nullable(),
+  region: z.string().nullable(),
+});
+export type NormalizedInstitution = z.infer<typeof normalizedInstitutionSchema>;
+
 export const observationSourceSchema = z.enum(['voice', 'text', 'photo']);
 export type ObservationSource = z.infer<typeof observationSourceSchema>;
 
