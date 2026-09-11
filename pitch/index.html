@@ -94,6 +94,10 @@
       background: var(--secondary); color: var(--pine-deep);
       border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 500;
     }
+    .team { margin-top: 36px; }
+    .team .kicker { margin-bottom: 10px; }
+    .team ul { list-style: none; display: grid; gap: 4px; }
+    .team li { font-size: 16px; font-weight: 500; color: var(--ink); }
 
     /* —— Problema —— */
     .two { grid-template-columns: 1.05fr 0.95fr; gap: 48px; align-items: center; }
@@ -210,6 +214,21 @@
 
     /* —— Demo —— */
     .demo-grid { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 40px; align-items: start; }
+    .merge { display: grid; gap: 10px; width: min(100%, 340px); justify-self: end; }
+    .visit {
+      background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+      padding: 14px 16px; font-size: 14px;
+    }
+    .visit small { display: block; color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+    .visit.ghost { opacity: 0.72; }
+    .arrow {
+      text-align: center; color: var(--pine); font-size: 20px; letter-spacing: 0.2em;
+    }
+    .one {
+      background: var(--pine); color: #F7F3EA; border-radius: 16px; padding: 16px 18px;
+    }
+    .one strong { display: block; font-family: Newsreader, serif; font-size: 22px; font-weight: 600; }
+    .one p { margin-top: 6px; font-size: 13px; opacity: 0.88; }
     ol.flow { list-style: none; display: grid; gap: 12px; margin-top: 22px; }
     ol.flow li {
       display: grid; grid-template-columns: 42px 1fr; gap: 14px; align-items: start;
@@ -264,11 +283,20 @@
       <div>
         <p class="kicker">Decentralized AI Hackathon · ISD × Tether</p>
         <div class="wordmark"><span>Q-Pino</span></div>
-        <p class="lede">El cuaderno de campo que entiende la visita y se queda en el teléfono. Observaciones de equipos médicos, con evidencia. Inferencia en QVAC, de Tether — no en la nube.</p>
+        <p class="lede">Hablás o fotografías la placa. El teléfono entiende la visita y no manda nada a la nube. Eso es Q-Pino — con QVAC, de Tether, corriendo en el dispositivo.</p>
         <div class="meta">
-          <span class="chip">On-device</span>
-          <span class="chip">Whisper · OCR · Qwen</span>
-          <span class="chip">iOS / Android</span>
+          <span class="chip">En el teléfono</span>
+          <span class="chip">Voz y placa</span>
+          <span class="chip">Sin duplicar equipos</span>
+        </div>
+        <div class="team">
+          <p class="kicker">Equipo de desarrollo</p>
+          <ul>
+            <li>Ovidio Calderon</li>
+            <li>Enrique Fong</li>
+            <li>Diego Santimateo</li>
+            <li>Jabneel Gonzáles</li>
+          </ul>
         </div>
       </div>
       <div class="mark"><img src="icon.png" alt="Isotipo Q-Pino, Q verde con placa y ramita de pino" /></div>
@@ -279,20 +307,24 @@
       <div>
         <p class="kicker">01 · El problema</p>
         <p class="strike">El inventario de equipos médicos <em>nace en la visita</em> y se muere en el cuaderno.</p>
-        <p class="lede" style="max-width:28rem">Quien entra al hospital ve el tomógrafo. Anota, graba, fotografía. El dato no llega entero, se duplica, o viaja a un Excel que nadie consulta con confianza.</p>
+        <p class="lede" style="max-width:28rem">Entrá al hospital, ves un tomógrafo, anotas o grabás. Al día siguiente ese dato está incompleto, repetido, o perdido en un Excel.</p>
       </div>
       <div class="pain">
         <article>
-          <h3>Sin evidencia</h3>
-          <p>No se distingue lo que el técnico confirmó en placa de lo que estimó de memoria.</p>
+          <h3>No se sabe qué tan cierto es</h3>
+          <p>Lo visto en la placa y lo recordado de memoria quedan mezclados.</p>
         </article>
         <article>
-          <h3>Consultar es filtrar a mano</h3>
-          <p>«¿Quién tiene resonadores de más de 7 años en México?» no cabe en una nota de voz.</p>
+          <h3>El mismo equipo aparece dos veces</h3>
+          <p>Volvés al mismo hospital y el inventario cree que hay otra máquina.</p>
         </article>
         <article>
-          <h3>La nube no entra al hospital</h3>
-          <p>Audio y fotos de equipos son datos sensibles. Muchos sitios no tienen red usable.</p>
+          <h3>Preguntar es buscar a mano</h3>
+          <p>Nadie tiene a mano quién tiene resonadores viejos en México.</p>
+        </article>
+        <article>
+          <h3>Subir audio y fotos no sirve</h3>
+          <p>En el hospital a menudo no hay red. Y esos datos no deberían irse a la nube.</p>
         </article>
       </div>
     </section>
@@ -301,109 +333,40 @@
     <section class="slide pad two" data-title="Solución">
       <div>
         <p class="kicker">02 · Cómo lo resolvemos</p>
-        <h2>Dictás o fotografías.<br />El teléfono estructura.</h2>
-        <p class="lede">Whisper transcribe. El OCR lee la placa. Qwen extrae cliente, modalidad, fabricante, modelo, cantidad y año. Cada campo nace con un estado: Confirmado, Reportado, Estimado o Desconocido.</p>
-        <p class="lede" style="margin-top:12px">Las visitas se unen al mismo cliente y al mismo equipo. Después preguntás en español, portugués o inglés — contra SQLite local, no contra un chat que inventa números.</p>
+        <h2>Hablás. El teléfono ordena.<br />Y no duplica.</h2>
+        <p class="lede">Una nota de voz o una foto de la placa alcanza. Q-Pino saca el hospital, el tipo de equipo, la marca y el año — y te dice si lo vio, si lo contaron, o si lo estimó.</p>
+        <p class="lede" style="margin-top:12px">Si volvés al mismo sitio, reconoce el hospital. Si es el mismo tomógrafo, lo suma al historial; no crea otro. Si no está seguro, pregunta. Después podés preguntarle en castellano: los números salen de lo que ya capturaste, no de una ocurrencia.</p>
       </div>
-      <div class="phones">
-        <div class="phone">
-          <div class="screen">
-            <div class="notch">9:41</div>
-            <div class="app">
-              <h4>Capturar</h4>
-              <p class="sub">Observación en campo · on-device</p>
-              <div class="mic" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"/></svg>
-              </div>
-              <div class="wave">
-                <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
-              </div>
-              <div class="note"><span class="type">En el Hospital Andino Sur hay un tomógrafo Siemens Somatom del 2018.</span></div>
-              <div class="card-eq">
-                <strong>Siemens · Somatom</strong>
-                <div class="row"><span>Modalidad CT</span><span class="st ok">Confirmado</span></div>
-                <div class="row"><span>Año 2018</span><span class="st rep">Reportado</span></div>
-                <div class="row"><span>Cantidad 1</span><span class="st est">Estimado</span></div>
-              </div>
-            </div>
-            <div class="tabs">
-              <span class="on">Capturar</span><span>Clientes</span><span>Dashboard</span><span>Mapa</span><span>Consultas</span>
-            </div>
-          </div>
+      <div class="merge">
+        <div class="visit ghost">
+          <small>Lunes · una nota de voz</small>
+          Hospital Central · un tomógrafo GE
         </div>
-        <div class="phone sm">
-          <div class="screen">
-            <div class="notch">9:41</div>
-            <div class="app">
-              <h4>Consultas</h4>
-              <p class="sub">Lenguaje natural · números anclados</p>
-              <div class="qbox"><span class="qtype">Tomógrafos de más de 7 años</span></div>
-              <div class="filters">
-                <span>CT</span><span>minAge 7</span>
-              </div>
-              <div class="answer">
-                <div class="big">12</div>
-                <p style="font-size:12px;margin-top:6px;color:var(--muted)">equipos cumplen el filtro. El resumen lo redacta el modelo; los números salen de la base local.</p>
-              </div>
-            </div>
-            <div class="tabs">
-              <span>Capturar</span><span>Clientes</span><span>Dashboard</span><span>Mapa</span><span class="on">Consultas</span>
-            </div>
-          </div>
+        <div class="visit ghost">
+          <small>Miércoles · foto de la placa</small>
+          Mismo hospital · misma máquina
+        </div>
+        <div class="arrow">↓ un solo equipo</div>
+        <div class="one">
+          <strong>Un hospital. Un tomógrafo.</strong>
+          <p>Dos visitas, un historial. No aparecen dos máquinas donde hay una.</p>
         </div>
       </div>
     </section>
 
-    <!-- 4 On-device -->
-    <section class="slide pad two" data-title="On-device">
+    <!-- 4 Tecnología -->
+    <section class="slide pad two" data-title="Tecnología">
       <div>
-        <p class="kicker">03 · Sobre QVAC</p>
-        <h2>La inferencia no sale del teléfono.</h2>
-        <p class="lede">Q-Pino corre sobre QVAC, la plataforma de Tether: Whisper, OCR y Qwen en el dispositivo. Los pesos se descargan una vez. Alojar una pantalla o guardar datos no sensibles en la nube no rompe la regla; enrutar un prompt a una API sí — y eso no ocurre aquí.</p>
-        <p class="ban">Sin API de inferencia. Si no hay red en el hospital, la visita sigue.</p>
+        <p class="kicker">03 · La tecnología</p>
+        <h2>Todo corre en el teléfono, con QVAC.</h2>
+        <p class="lede">QVAC es la plataforma de Tether: modelos de inteligencia artificial que viven en el dispositivo. No hay API en la nube para entender voz, leer la placa ni responder. La primera vez se descarga; después funciona sin internet.</p>
+        <p class="ban">Eso es el requisito del hackathon — y lo que permite usarlo dentro del hospital.</p>
       </div>
       <div class="stack">
-        <div class="eng"><i class="dot"></i><div><strong>Qwen</strong><small>Extrae la observación y traduce la consulta a un filtro. Nunca escribe SQL.</small></div><code>on-device</code></div>
-        <div class="eng"><i class="dot"></i><div><strong>Whisper</strong><small>Voz a texto en el micrófono de campo, sin subir el audio.</small></div><code>on-device</code></div>
-        <div class="eng"><i class="dot"></i><div><strong>OCR ggml</strong><small>Lee la placa; esa lectura marca el campo como Confirmado.</small></div><code>on-device</code></div>
-        <div class="eng"><i class="dot"></i><div><strong>SQLite</strong><small>Clientes, equipos e historial de visitas. Consulta determinística.</small></div><code>local</code></div>
-      </div>
-    </section>
-
-    <!-- 5 Demo -->
-    <section class="slide pad demo-grid" data-title="Demo">
-      <div>
-        <p class="kicker">Ahora · la demo</p>
-        <h2>Tres gestos. El resto es el teléfono.</h2>
-        <ol class="flow">
-          <li>
-            <span class="n">1</span>
-            <div>
-              <strong>Capturar</strong>
-              <p class="lede" style="margin-top:4px;font-size:16px">Nota de voz o texto. Mostrar extracción y chips de evidencia.</p>
-            </div>
-          </li>
-          <li>
-            <span class="n">2</span>
-            <div>
-              <strong>Placa</strong>
-              <p class="lede" style="margin-top:4px;font-size:16px">Foto → OCR → Confirmar. Una observación, no un duplicado.</p>
-            </div>
-          </li>
-          <li>
-            <span class="n">3</span>
-            <div>
-              <strong>Consultas</strong>
-              <p class="lede" style="margin-top:4px;font-size:16px">«Tomógrafos de más de 7 años» o «clientes con información incompleta».</p>
-            </div>
-          </li>
-        </ol>
-      </div>
-      <div class="plate">
-        <div class="tag">SIEMENS<br />SOMATOM<br />SN · 2018</div>
-        <p>La placa es la prueba más fuerte. El modelo no adivina el año si el texto dice «instalado en 2018».</p>
-        <img src="icon.png" alt="" style="width:72px;height:72px;margin-top:18px;border-radius:16px;opacity:0.95" />
-        <p style="margin-top:8px;font-family:Newsreader,serif;font-size:22px;color:var(--pine)">Q-Pino</p>
+        <div class="eng"><i class="dot"></i><div><strong>Qwen</strong><small>El modelo que entiende la nota y la pregunta. Extrae hospital, equipo, marca y año. No inventa los números.</small></div><code>QVAC</code></div>
+        <div class="eng"><i class="dot"></i><div><strong>Whisper</strong><small>Pasa la voz a texto en el mismo teléfono. El audio no se sube.</small></div><code>QVAC</code></div>
+        <div class="eng"><i class="dot"></i><div><strong>OCR</strong><small>Lee la placa del equipo. Confirma lo que está escrito en la máquina.</small></div><code>QVAC</code></div>
+        <div class="eng"><i class="dot"></i><div><strong>En el dispositivo</strong><small>Inferencia local o entre teléfonos. Una API en la nube descalifica; aquí no se usa.</small></div><code>on-device</code></div>
       </div>
     </section>
   </div>
@@ -425,11 +388,10 @@
     const dots = document.getElementById("dots");
     const notesEl = document.getElementById("notes");
     const NOTES = [
-      "5 s. Q-Pino, el producto. QVAC es la plataforma de Tether, no el nombre de la app.",
-      "35 s. El dato nace en la visita y se pierde. Evidencia, consulta, privacidad.",
-      "35 s. Voz/foto → estructura con chips. Consulta anclada a SQLite, no al chat.",
-      "25 s. Qwen, Whisper, OCR on-device. Pesos una vez. Sin API de inferencia.",
-      "Pasar a la app. 1 Capturar 2 Placa 3 Consultas. Si aprieta: voz + consulta. Cierre: «Campo, evidencia y consulta, todo en el dispositivo.»"
+      "Somos Q-Pino. El cuaderno que entiende la visita y se queda en el teléfono.",
+      "El dato nace en el hospital y se pierde o se duplica. Preguntar es buscar a mano. La nube no entra.",
+      "Hablás o fotografías. Ordena. Si es el mismo tomógrafo, no crea otro. Si duda, pregunta.",
+      "QVAC en el teléfono: Qwen, Whisper, OCR. Sin API en la nube. Primera descarga, después offline. Pasar a la demo.",
     ];
     let i = 0;
 
