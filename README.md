@@ -242,7 +242,85 @@ Eso alimenta Dashboard y el detalle de equipo.
 
 Si un campo sigue Desconocido, [`computeNextQuestion`](src/core/followup/nextQuestion.ts) elige **una** pregunta (sin LLM): primero fabricante, luego antigüedad, modelo, cantidad.
 
-La resolución de hospital/equipo (auto / preguntar / nuevo) es otra capa: evita duplicar entidades. La veracidad es qué tan creíble es cada campo **dentro** de esa entidad.
+## Duplicidad: hospital y equipo
+
+La veracidad dice qué tan creíble es un campo. La **resolución de entidades** decide si es el mismo hospital o la misma máquina. Un merge silencioso equivocado es peor que un duplicado: por eso, si hay duda, se pregunta.
+
+Antes de comparar nombres, [`stripTrailingPlaceName`](src/core/normalize/geo.ts) saca ciudad/país pegados al nombre («Hospital Andino Sur, Bogotá» → «Hospital Andino Sur») para no mezclar geo con el cliente.
+
+### Institución
+
+[`resolveInstitution`](src/core/resolve/institution.ts) recorre el roster:
+
+1. Si ambos tienen país y **no es el mismo**, no se comparan (un «Hospital Central» en PA no se fusiona con uno en CO).
+2. Similaridad fuzzy del nombre (`nameSimilarity`).
+3. El mejor candidato cae en una de tres bandas:
+
+```mermaid
+flowchart TD
+  claim[Nombre extraído] --> country{Mismo país o país desconocido?}
+  country -->|No| skip[No comparar]
+  country -->|Sí| score[Similaridad de nombre]
+  score -->|mayor o igual 0.92| auto[auto_merge: mismo cliente, sin preguntar]
+  score -->|0.75 a 0.92| ask["ask: ¿Es el mismo que X?"]
+  score -->|menor 0.75| nuevo[new: institución nueva]
+```
+
+Umbrales: `AUTO_MERGE_THRESHOLD = 0.92`, `ASK_THRESHOLD = 0.75`. Se evalúan contra el golden set de [`eval/`](eval/README.md): precisión de auto-merge ≥97%, recall de detección ≥85% (auto-merge + ask cuentan como «lo agarró»).
+
+### Equipo
+
+Dentro del hospital, [`assignToSlot`](src/core/resolve/asset.ts) intenta enganchar la observación a un equipo ya existente.
+
+**Conflicto duro** (`hasHardConflict`) — no se fusionan, aunque el resto se parezca:
+
+- Serial distinto
+- Fabricante Reportado+ que no se parece (Jaro-Winkler menor a 0.85)
+- `catalogModelId` distinto
+- Intervalos de año de instalación que no se solapan, ambos Reportado+
+
+**Score blando** (`matchScore`): un serial **exacto** vale 1 y cierra el match. Si no hay serial, suman modelo/catálogo, fabricante, solape de años y `whichUnit`. Mínimo 0.35. Si los dos mejores candidatos están a menos de 0.15, el resultado es **ambiguous** (preguntar), no un guess.
+
+| Resultado | Qué hace |
+|-----------|----------|
+| `matched` | Misma máquina: se agrega historial, no se crea otra fila |
+| `ambiguous` | Pregunta al usuario |
+| `no_match` | Equipo nuevo |
+
+Las cantidades de flota **no se suman**. Dos visitas que dicen «3 resonadores» describen los mismos tres ([`reconcileCount`](src/core/resolve/fleet.ts)). Si discrepan, se marca conflicto y gana el claim con más evidencia.
+
+El serial leído por OCR es la señal más fuerte para no duplicar: misma placa → misma máquina.
+
+## OCR de placa
+
+La placa es la evidencia más fuerte. Corre **on-device** con ggml-ocr (`OCR_LATIN` vía QVAC), no con un LLM mirando la foto.
+
+```mermaid
+flowchart LR
+  cam[Cámara expo-image-picker] --> path[Path sin file://]
+  path --> ocr["ocr QVAC canvas 1280"]
+  ocr --> lines[Bloques de texto]
+  lines --> parse[parsePlateText]
+  parse --> fields[serial fabricante modelo año]
+  fields --> conf[Campos Confirmado]
+```
+
+[`scanPlate`](src/ai/plateOcr.ts):
+
+- Quita el prefijo `file://` (QVAC lee el filesystem, no URIs).
+- Carga OCR en exclusivo (`withModel`) y baja el canvas a **1280 px** para que fotos de ~4000 px no revienten la alocación ggml.
+- Devuelve líneas crudas más el parse estructurado.
+
+[`parsePlateText`](src/core/normalize/plate.ts) no usa el modelo de lenguaje. Regex + catálogo ficticio:
+
+- **Serial:** etiquetas `S/N`, `SN`, `SIN` (mallectura típica de S/N), `SERIE`. Si el OCR parte `MD2012-` y `00487` en dos bloques, se vuelven a unir.
+- **Modelo:** `REF` / `MOD`, o el nombre suelto si matchea el catálogo.
+- **Año:** solo junto a `FAB`, `MFG`, `AÑO`, `YEAR`, `FECHA` — un 2018 suelto no se toma (puede ser fragmento de serial).
+- **Fabricante:** fuzzy contra [`catalog.json`](src/core/normalize/catalog.json).
+
+Todo lo que sale de la placa se trata como **Confirmado**. En Capturar parchea el estado en memoria antes de guardar; en el detalle del equipo se persiste con `saveEquipmentEdit`.
+
+Se usa desde Capturar ([`src/app/(tabs)/index.tsx`](src/app/(tabs)/index.tsx)) y desde el equipo ([`src/app/equipment/[id].tsx`](src/app/equipment/[id].tsx)).
 
 ## Dataset de demostración
 
