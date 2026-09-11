@@ -2,9 +2,40 @@
 
 App móvil (iOS / Android) para **vigilancia del parque instalado de equipos médicos**. En la visita dictás o escribís una observación, o fotografías la placa del equipo. Q-Pino extrae hospital, modalidad, marca, modelo y antigüedad, evita duplicar clientes y máquinas, y deja consultar el parque en lenguaje natural.
 
-**Toda la inferencia corre en el dispositivo** con [QVAC](https://qvac.tether.io) (`@qvac/sdk`, Tether): extracción, consultas, Whisper y OCR. No hay API de inferencia en la nube. La primera ejecución descarga los pesos al teléfono; después funciona sin red.
+**Toda la inferencia corre en el dispositivo** con [QVAC](https://qvac.tether.io) (`@qvac/sdk`, Tether). Q-Pino no es un envoltorio de una API en la nube: los tres gestos del producto (dictar, leer la placa, preguntar) llaman a `completion`, `transcribe` y `ocr` del SDK. El detalle está en [Uso genuino de QVAC](#uso-genuino-de-qvac).
 
 El nombre comercial es **Q-Pino**. El repositorio y el slug Expo se llaman `QVAC`.
+
+## Uso genuino de QVAC
+
+QVAC es el **motor de inferencia**, no un logo. No hay `fetch` a OpenAI, Anthropic ni un backend propio que complete prompts. El plugin `@qvac/sdk/expo-plugin` empaqueta el worker Bare (`qvac/worker.bundle.js`). Los pesos se bajan una vez con `downloadAsset` y después Qwen, Whisper y OCR viven en el teléfono.
+
+Cada capacidad del producto usa un motor QVAC de verdad:
+
+| Gesto en la app | API `@qvac/sdk` | Motor | Archivo |
+|-----------------|-----------------|-------|---------|
+| Extraer hospital y equipo de la nota | `completion` + JSON schema | Qwen (llama.cpp) | [`src/ai/extract.ts`](src/ai/extract.ts) |
+| Entender la pregunta de Consultas | `completion` + JSON schema | Qwen | [`src/ai/queryParser.ts`](src/ai/queryParser.ts) |
+| Redactar la respuesta (números ya calculados) | `completion` | Qwen | [`src/ai/querySummary.ts`](src/ai/querySummary.ts) |
+| Voz → texto | `transcribe` | Whisper small Q8 | [`src/ai/asr.ts`](src/ai/asr.ts) |
+| Foto de placa → texto | `ocr` | ggml-ocr Latin | [`src/ai/plateOcr.ts`](src/ai/plateOcr.ts) |
+| Primera apertura | `downloadAsset` / `loadModel` | los tres | [`src/ai/modelManager.ts`](src/ai/modelManager.ts) |
+
+```mermaid
+flowchart LR
+  voice[Nota de voz] --> whisper["QVAC transcribe"]
+  text[Texto] --> qwen["QVAC completion"]
+  whisper --> qwen
+  plate[Foto de placa] --> ggml["QVAC ocr"]
+  qwen --> core[src/core normaliza y resuelve]
+  ggml --> core
+  ask[Pregunta] --> qwen
+  core --> sqlite[SQLite local]
+```
+
+Lo que **no** es QVAC (a propósito): Expo, SQLite, catálogo, gazetteer, deduplicación y umbrales de renovación. Esas capas son deterministas y testeables en Node. QVAC hace la parte que necesita un modelo: oír, leer la placa y estructurar lenguaje. El LLM **no escribe SQL** y **no mira la foto**; el OCR no extrae la observación. Cada motor tiene un trabajo.
+
+Sin red, después de la primera descarga, Capturar, placa y Consultas siguen andando. Eso es el requisito on-device, no un fallback.
 
 ## Descargar APK (Android)
 
@@ -178,6 +209,8 @@ El LLM redacta el resumen; `summaryIsGrounded` rechaza texto que no esté anclad
 
 ## Modelos y plugins QVAC
 
+Ver [Uso genuino de QVAC](#uso-genuino-de-qvac) para el mapa gesto → API. Resumen de assets:
+
 | Uso | Asset SDK | Dónde |
 |-----|-----------|-------|
 | Extracción y consultas | Qwen multimodal Q4_K_M (2B iOS / 0.8B Android) | `src/ai/extract.ts`, `src/ai/queryParser.ts` |
@@ -192,7 +225,7 @@ Plugins en [`qvac.config.json`](qvac.config.json):
 - `@qvac/sdk/whispercpp-transcription/plugin`
 - `@qvac/sdk/ggml-ocr/plugin`
 
-Los pesos no viven en el repo. QVAC los cachea en el filesystem del dispositivo vía `downloadAsset`. El worker empaquetado está en `qvac/worker.bundle.js`.
+Los pesos no viven en el repo. QVAC los cachea en el filesystem del dispositivo. El worker empaquetado está en `qvac/worker.bundle.js`. En producción se usa Whisper (`transcribe`), no Parakeet.
 
 ## Persistencia
 
@@ -448,7 +481,7 @@ La extracción LLM no se evalúa desde Node: el worker QVAC está atado al runti
 | Voz → texto | Whisper | On-device |
 | Lectura de placa | OCR ggml | On-device |
 
-La primera vez se **descargan los pesos** al teléfono (no es inferencia remota). Después la app funciona sin red.
+La primera vez se **descargan los pesos** al teléfono (no es inferencia remota). Después la app funciona sin red. Cómo está cableado: [Uso genuino de QVAC](#uso-genuino-de-qvac).
 
 ## Base preexistente (art. 11)
 
