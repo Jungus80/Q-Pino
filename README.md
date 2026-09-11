@@ -29,7 +29,7 @@ En el teléfono se instala como **Q-Pino**. Hace falta permitir instalaciones de
 | Mapa | `src/app/(tabs)/map.tsx` | Vista LATAM por país |
 | Consultas | `src/app/(tabs)/query.tsx` | Preguntas en lenguaje natural sobre el inventario |
 
-Cada dato lleva un nivel de certeza: **Confirmado** (placa u observación directa), **Reportado**, **Estimado** o **Desconocido**. Las observaciones y los `claims` son append-only; no se reescribe el historial de evidencia.
+Cada dato lleva un nivel de certeza: **Confirmado**, **Reportado**, **Estimado** o **Desconocido**. El detalle está en [Sistema de veracidad](#sistema-de-veracidad).
 
 ## Stack
 
@@ -195,6 +195,54 @@ Los pesos no viven en el repo. QVAC los cachea en el filesystem del dispositivo 
 Base: `installed-base.db` (op-sqlite).
 
 Tablas principales: `institutions`, `equipment`, `observations`, `claims`, `settings`. Cada campo escrito genera filas en `claims` (`status`, `evidence`, `observer_id`, `observed_at`).
+
+## Sistema de veracidad
+
+Q-Pino no trata un número extraído como un hecho plano. Cada campo (fabricante, modelo, antigüedad, cantidad) nace con un **estado de evidencia** y se guarda como un `claim`. El historial no se borra: una visita nueva puede ganar o perder frente a la anterior, pero las dos quedan.
+
+### Estados por campo
+
+| Estado | Qué significa | Ejemplo |
+|--------|---------------|---------|
+| **Confirmado** | Se vio en el equipo (sobre todo la placa / OCR) | Serial o modelo leídos de la etiqueta |
+| **Reportado** | Lo dijo alguien en la visita, anclado al texto | «Hay un tomógrafo Siemens del 2018» |
+| **Estimado** | Se infiere, no se afirmó con esa precisión | «Más o menos de hace unos años» |
+| **Desconocido** | No hay valor usable | El modelo no salió en la nota |
+
+El LLM propone el estado. Después [`normalizeObservation`](src/core/normalize/pipeline.ts) baja a `null` / Desconocido lo que **no está anclado** en el transcript (`isEvidenceAnchored`): si el modelo inventa una marca que no aparece en la nota, no entra.
+
+Una foto de placa parchea fabricante/modelo/año/serial a **Confirmado**. Eso pesa más que un dicho.
+
+### Cómo gana un dato sobre otro
+
+[`chooseBetween`](src/core/truth/consolidate.ts) compara dos claims del mismo campo:
+
+```mermaid
+flowchart TD
+  a[Claim actual] --> rank{Mayor rango de evidencia?}
+  b[Claim nuevo] --> rank
+  rank -->|Confirmado mayor que Reportado mayor que Estimado mayor que Desconocido| win[Gana el de más evidencia]
+  rank -->|Empate de estado| recency[Gana el más reciente]
+```
+
+Rango: Confirmado 3 > Reportado 2 > Estimado 1 > Desconocido 0. A igual rango, gana la fecha más nueva. El equipo en pantalla refleja al ganador; los `claims` siguen todos en SQLite.
+
+### Confianza del equipo
+
+[`computeConfidence`](src/core/score/confidence.ts) resume un equipo en un score 0–100 (bandas Alta ≥70 / Media ≥40 / Baja):
+
+- 35% completitud (cuántos campos no son Desconocido)
+- 30% fuerza de evidencia (promedio de estados: Confirmado 1, Reportado 0.7, Estimado 0.4)
+- 20% frescura (vida media 180 días desde la última verificación)
+- 15% confirmaciones independientes
+
+Eso alimenta Dashboard y el detalle de equipo.
+
+### Qué falta, se pregunta
+
+Si un campo sigue Desconocido, [`computeNextQuestion`](src/core/followup/nextQuestion.ts) elige **una** pregunta (sin LLM): primero fabricante, luego antigüedad, modelo, cantidad.
+
+La resolución de hospital/equipo (auto / preguntar / nuevo) es otra capa: evita duplicar entidades. La veracidad es qué tan creíble es cada campo **dentro** de esa entidad.
 
 ## Dataset de demostración
 
