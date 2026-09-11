@@ -190,6 +190,33 @@ Base: `installed-base.db` (op-sqlite).
 
 Tablas principales: `institutions`, `equipment`, `observations`, `claims`, `settings`. Cada campo escrito genera filas en `claims` (`status`, `evidence`, `observer_id`, `observed_at`).
 
+## Dataset de demostración
+
+No hay un dump clínico real. Lo que usa la app es un **dataset sintético pequeño**, pensado para Clientes, Dashboard y Consultas sin inflar el binario. Se siembra solo si la base está vacía (`seedIfEmpty` en [`src/db/seed.ts`](src/db/seed.ts)).
+
+Los seis clientes viven en [`src/core/demo/seedInstitutions.ts`](src/core/demo/seedInstitutions.ts) (Panamá y Colombia):
+
+| Institución | Ciudad | País | Equipos (resumen) |
+|-------------|--------|------|-------------------|
+| Hospital DemoCare Pacific | Ciudad de Panamá | PA | MR + US Meridian |
+| Clínica Istmo Norte | Colón | PA | CT Solara + US Verdant |
+| Hospital Chiriquí Central | David | PA | CT Northfield + XR incompleto |
+| Hospital Andino Sur | Bogotá | CO | MR Solara + CT Northfield |
+| Clínica Cordillera | Medellín | CO | US Meridian + MG Verdant |
+| Centro Médico del Valle | Cali | CO | PET-CT Halcyon + monitoreo Kestrel |
+
+Las observaciones de siembra se marcan como `Dato de siembra (dataset sintético de demostración).` El observador es `seed`. Un equipo queda a propósito incompleto (XR sin marca ni año) para mostrar estados Desconocido.
+
+Referencias pequeñas que acompañan ese seed (no son el parque instalado):
+
+| Archivo | Qué es |
+|---------|--------|
+| [`src/core/normalize/catalog.json`](src/core/normalize/catalog.json) | Fabricantes y modelos **ficticios** (guardrail del hackathon). Se puede sustituir por un catálogo real sin tocar el resto del código. |
+| [`src/core/normalize/gazetteer.json`](src/core/normalize/gazetteer.json) | Gazetteer offline chico (países LATAM + algunas ciudades) para normalizar geo. |
+| [`src/core/asr/whisperVocabulary.json`](src/core/asr/whisperVocabulary.json) | Vocabulario ASR Panamá + Colombia. Es independiente del seed de Clientes. |
+
+Los golden sets de [`eval/`](eval/README.md) no se cargan en el teléfono: son casos de prueba (pares de instituciones y preguntas → DSL).
+
 ## Cómo correr
 
 Requisitos: Node, Xcode (iOS) o Android SDK (**minSdk 29**).
