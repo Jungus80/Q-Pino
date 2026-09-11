@@ -326,6 +326,55 @@ Todo lo que sale de la placa se trata como **Confirmado**. En Capturar parchea e
 
 Se usa desde Capturar ([`src/app/(tabs)/index.tsx`](src/app/(tabs)/index.tsx)) y desde el equipo ([`src/app/equipment/[id].tsx`](src/app/equipment/[id].tsx)).
 
+## Antigüedad y renovación
+
+La edad no se guarda como «tiene X años». Se guarda un **intervalo de año de instalación** (`installYearLo` / `installYearHi`). La antigüedad que ves es el punto medio de ese intervalo contra el año actual ([`ageMidpointYears`](src/core/normalize/age.ts)).
+
+### Cómo se obtiene el año
+
+[`parseAge`](src/core/normalize/age.ts):
+
+| Lo que dijo o se leyó | Qué se guarda | Estado |
+|-----------------------|---------------|--------|
+| Año calendario («instalado en 2018», placa `FAB: 2018`) | Ese año exacto (lo = hi) | Reportado; Confirmado si hay lenguaje de placa/verificación |
+| Años de uso («unos ocho años») | Año actual − esos años | Estimado (un número de años siempre es aproximado) |
+| Nada usable | Intervalo vacío | Desconocido |
+
+Un año dicho en la cita gana a un `ageYears` inventado por el modelo (evitar que «del año 2005» se vuelva 1966).
+
+### Qué tan viejo se considera
+
+Dashboard agrupa en cubetas ([`AGE_BUCKETS`](src/core/score/dashboard.ts)): **0–3**, **4–7**, **8–10**, **11+**, **Desconocida**.
+
+«Viejo» para **renovar** no es un corte único. Cada modalidad tiene umbral en [`catalog.json`](src/core/normalize/catalog.json) (`renewalThresholdYears`). [`isRenewalDue`](src/core/score/dashboard.ts): hay oportunidad de renovación si la edad (punto medio) es **mayor o igual** al umbral.
+
+| Modalidad | Renovar desde (años) |
+|-----------|----------------------|
+| US | 6 |
+| MONITORING | 7 |
+| CT, MG | 8 |
+| PET_CT, SPECT, NM, ANGIO | 9 |
+| MR, XR, OTHER | 10 |
+
+Ejemplo: un CT de ~8 años entra en «para renovar»; un MR de 8 años todavía no (umbral 10). Sin edad conocida **no** se marca renovación.
+
+Dashboard lista esas filas como oportunidades (hasta 10, ordenadas por cuánto se pasaron del umbral). Consultas usa la **misma** función: «equipos para renovar», «tomógrafos obsoletos», etc.
+
+Eso no es lo mismo que **desactualizado**: un cliente está stale si la última verificación es de hace **más de 365 días** (`STALE_DAYS`). Puede ser un equipo nuevo que nadie visitó en un año, o uno viejo recién visto: son ejes distintos.
+
+```mermaid
+flowchart TD
+  raw[Año o años de uso] --> parse[parseAge]
+  parse --> interval[installYearLo Hi]
+  interval --> mid[Edad punto medio]
+  mid --> buckets[Cubetas 0-3 4-7 8-10 11+]
+  mid --> thresh{edad mayor o igual umbral de modalidad?}
+  thresh -->|Sí| renew[Oportunidad de renovación]
+  thresh -->|No o edad desconocida| ok[No se marca para renovar]
+  visit[lastVerifiedAt] --> stale{mas de 365 días?}
+  stale -->|Sí| staleClient[Cliente desactualizado]
+```
+
 ## Dataset de demostración
 
 No hay un dump clínico real. Lo que usa la app es un **dataset sintético pequeño**, pensado para Clientes, Dashboard y Consultas sin inflar el binario. Se siembra solo si la base está vacía (`seedIfEmpty` en [`src/db/seed.ts`](src/db/seed.ts)).
