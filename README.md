@@ -12,6 +12,10 @@ El nombre comercial es **Q-Pino**. El repositorio y el slug Expo se llaman `QVAC
 
 En el teléfono se instala como **Q-Pino**. Hace falta permitir instalaciones de fuentes desconocidas. La primera vez necesita internet para bajar los modelos; después funciona sin red. Requiere Android 10+ (`minSdk` 29).
 
+## Video
+
+Demo de Q-Pino: [ver en Google Drive](https://drive.google.com/file/d/1FYTvQBYUPz9Y0vev8d2QuRrKKVpl51aF/view?usp=sharing).
+
 ## Equipo de desarrollo
 
 - Ovidio Calderon
