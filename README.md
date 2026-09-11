@@ -6,6 +6,12 @@ App móvil (iOS / Android) para **vigilancia del parque instalado de equipos mé
 
 El nombre comercial es **Q-Pino**. El repositorio y el slug Expo se llaman `QVAC`.
 
+## Descargar APK (Android)
+
+[**Q-Pino.apk**](https://github.com/Jungus80/Q-Pino/releases/download/v1.0.0/Q-Pino.apk) — release [v1.0.0](https://github.com/Jungus80/Q-Pino/releases/tag/v1.0.0).
+
+En el teléfono se instala como **Q-Pino**. Hace falta permitir instalaciones de fuentes desconocidas. La primera vez necesita internet para bajar los modelos; después funciona sin red. Requiere Android 10+ (`minSdk` 29).
+
 ## Equipo de desarrollo
 
 - Ovidio Calderon
@@ -239,7 +245,9 @@ Scripts:
 | `npm run eval:query` | Pregunta → DSL ([detalle](eval/README.md)) |
 | `npm run lint` | ESLint Expo |
 
-La primera ejecución **necesita internet** para bajar modelos. Después la app es offline. APK de release: `cd android && ./gradlew assembleRelease`.
+La primera ejecución **necesita internet** para bajar modelos. Después la app es offline.
+
+APK listo para instalar: [Q-Pino.apk](https://github.com/Jungus80/Q-Pino/releases/download/v1.0.0/Q-Pino.apk). Para regenerarlo: `cd android && ./gradlew assembleRelease`.
 
 La extracción LLM no se evalúa desde Node: el worker QVAC está atado al runtime Expo. Esa mitad se valida en dispositivo; lo posterior al LLM (normalización, resolución, consultas) sí corre en Vitest y en `eval/`.
 
