@@ -2,6 +2,8 @@ import { listInstitutions, type InstitutionRow } from '@/db/repos/institutions';
 import { listAllEquipment, listEquipmentForInstitution } from '@/db/repos/equipment';
 import { seedIfEmpty } from '@/db/seed';
 import { resetDb } from '@/db/client';
+import { Icon } from '@/components/Icon';
+import { TabScreenSafeAreaEdges } from '@/constants/theme';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, Text, View } from 'react-native';
@@ -49,7 +51,7 @@ export default function ClientsScreen() {
   function handleReset() {
     Alert.alert(
       'Reiniciar datos de prueba',
-      'Borra todos los clientes y equipos guardados y vuelve a cargar los 5 clientes ficticios de siembra. Esto no se puede deshacer.',
+      'Borra todos los clientes y equipos guardados y vuelve a cargar los 6 clientes ficticios de siembra (Panamá y Colombia). Esto no se puede deshacer.',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -66,14 +68,14 @@ export default function ClientsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 bg-white items-center justify-center">
+      <SafeAreaView className="flex-1 bg-white items-center justify-center" edges={TabScreenSafeAreaEdges}>
         <ActivityIndicator color="#0066CC" size="large" />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-white" edges={TabScreenSafeAreaEdges}>
       <View className="px-4 pt-4 pb-4 border-b border-gray-200">
         <View className="flex-row items-center justify-between mb-3">
           <View>
@@ -82,8 +84,9 @@ export default function ClientsScreen() {
               {institutions.length} clientes · {Object.values(totalsByModality).reduce((a, b) => a + b, 0)} equipos
             </Text>
           </View>
-          <Pressable onPress={handleReset} className="bg-red-50 rounded-lg px-3 py-2">
-            <Text className="text-red-600 text-xs font-semibold">Reiniciar</Text>
+          <Pressable onPress={handleReset} className="bg-red-50 rounded-lg px-3 py-2 flex-row items-center gap-1">
+            <Icon name="close" size="sm" color="#DC2626" />
+            <Text className="text-red-600 text-xs font-semibold">Restablecer</Text>
           </Pressable>
         </View>
         <View className="flex-row flex-wrap gap-2">
@@ -107,10 +110,15 @@ export default function ClientsScreen() {
           <Pressable
             onPress={() => router.push(`/clients/${item.id}`)}
             className="bg-white border border-gray-200 rounded-xl p-4 mb-3">
-            <Text className="text-gray-900 font-bold text-base">{item.name}</Text>
-            <Text className="text-gray-600 text-sm mt-1">
-              {[item.city, item.countryIso].filter(Boolean).join(', ') || 'Ubicación desconocida'}
-            </Text>
+            <View className="flex-row items-start justify-between">
+              <View className="flex-1">
+                <Text className="text-gray-900 font-bold text-base">{item.name}</Text>
+                <Text className="text-gray-600 text-sm mt-1">
+                  {[item.city, item.countryIso].filter(Boolean).join(', ') || 'Ubicación no especificada'}
+                </Text>
+              </View>
+              <Icon name="chevron-right" size="md" color="#D1D5DB" />
+            </View>
             <View className="flex-row flex-wrap gap-2 mt-3">
               {item.modalities.map((m) => (
                 <View key={m} className="bg-blue-50 rounded-lg px-2.5 py-1">

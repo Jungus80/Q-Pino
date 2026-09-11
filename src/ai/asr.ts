@@ -4,9 +4,9 @@ import { toByteArray } from 'base64-js';
 import { useCallback, useRef, useState } from 'react';
 import { loadExclusive, unloadCurrentModel } from './modelManager';
 import { bytesToPCM16, rmsLevel } from './resample';
-import { WHISPER_VOCABULARY_PROMPT } from './prompts/whisperPrompt';
+import { buildWhisperPrompt } from './prompts/whisperPrompt';
 
-const SAMPLE_RATE = 16000;
+const SAMPLE_RATE = 16000 as const;
 
 /**
  * Push-to-talk voice capture: records to a WAV file, then transcribes the whole clip in
@@ -29,6 +29,13 @@ const SAMPLE_RATE = 16000;
 export function useVoiceCapture() {
   const { startRecording, stopRecording } = useAudioRecorder();
   const [isRecording, setIsRecording] = useState(false);
+  // True from the moment start() is called until the native recorder has actually
+  // started (permission prompt + AudioRecord/audio-focus setup — can take a
+  // noticeable beat on some Android devices). Without this, isRecording stays false
+  // during that gap and the "Presiona para grabar" button looks untouched, so a tap
+  // meant to stop just silently no-ops against the busyRef guard instead of doing
+  // anything visible.
+  const [isStarting, setIsStarting] = useState(false);
   const [isLoadingModel, setIsLoadingModel] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
@@ -36,10 +43,12 @@ export function useVoiceCapture() {
 
   const busyRef = useRef(false); // guards against a double-tap firing start() twice
   const modelPromiseRef = useRef<Promise<string> | null>(null);
+  const promptPromiseRef = useRef<Promise<string> | null>(null);
 
   const start = useCallback(async () => {
     if (busyRef.current) return;
     busyRef.current = true;
+    setIsStarting(true);
     setError(null);
     setAudioLevel(0);
     let step = 'PERMISSION';
@@ -62,11 +71,14 @@ export function useVoiceCapture() {
         modelConfig: { language: 'auto' },
       }).finally(() => setIsLoadingModel(false));
 
-      step = 'START_RECORDING';
-      await startRecording({
+      // Build the Whisper vocabulary prompt in parallel with recording — DB clients
+      // first, then reference hospitals/cities from whisperVocabulary.json.
+      promptPromiseRef.current = buildWhisperPrompt();
+
+      const recordingOptions = {
         sampleRate: SAMPLE_RATE,
-        channels: 1,
-        encoding: 'pcm_16bit',
+        channels: 1 as const,
+        encoding: 'pcm_16bit' as const,
         // audio-studio defaults keepAwake to true, which configures a background-capable
         // audio session — that activation fails ("Session activation failed", OSStatus
         // 561017449) without the "audio" UIBackgroundModes entitlement, which this
@@ -76,13 +88,28 @@ export function useVoiceCapture() {
           if (typeof event.data !== 'string') return; // native hands back base64 PCM16LE
           setAudioLevel(rmsLevel(bytesToPCM16(toByteArray(event.data))));
         },
-      });
+      };
+
+      step = 'START_RECORDING';
+      try {
+        await startRecording(recordingOptions);
+      } catch (e: any) {
+        // A prior stop() can leave the native recorder stuck "active" if it failed
+        // before clearing its own recording flag, while this hook's `isRecording`
+        // state had already moved on to false — the mic button then looks idle but
+        // the next tap hits ALREADY_RECORDING. Force the stale session closed and
+        // retry once instead of surfacing a confusing error for a stuck stale state.
+        if (e?.code !== 'ALREADY_RECORDING') throw e;
+        await stopRecording().catch(() => {});
+        await startRecording(recordingOptions);
+      }
       setIsRecording(true);
     } catch (e: any) {
       console.error(`[voice] start failed at step ${step}:`, e);
       setError(`[${step}] ` + (e?.message || e?.code || 'Error desconocido al iniciar la grabación'));
     } finally {
       busyRef.current = false;
+      setIsStarting(false);
     }
   }, [startRecording]);
 
@@ -92,7 +119,13 @@ export function useVoiceCapture() {
     let step = 'STOP_RECORDING';
     try {
       const result = await stopRecording();
-      const filePath = result.fileUri.replace(/^file:\/\//, '');
+      // Strip the file:// URI scheme down to an absolute path. Android's
+      // File.toURI().toString() (java.io.File) yields "file:/data/..." — a single
+      // slash, since the path itself supplies the leading "/" — while iOS's NSURL
+      // yields "file:///var/..." (triple slash). Match one-or-more slashes so both
+      // survive; a fixed two-slash match silently no-ops on Android and leaves the
+      // "file:" scheme glued onto the path, which then 404s downstream as ENOENT.
+      const filePath = result.fileUri.replace(/^file:\/+/, '/');
 
       step = 'LOAD_MODEL';
       if (!modelPromiseRef.current) {
@@ -110,7 +143,10 @@ export function useVoiceCapture() {
 
       step = 'TRANSCRIBE';
       setIsTranscribing(true);
-      const text = await transcribe({ modelId, audioChunk: filePath, prompt: WHISPER_VOCABULARY_PROMPT });
+      if (!promptPromiseRef.current) promptPromiseRef.current = buildWhisperPrompt();
+      const prompt = await promptPromiseRef.current;
+      promptPromiseRef.current = null;
+      const text = await transcribe({ modelId, audioChunk: filePath, prompt });
       return text.trim();
     } catch (e: any) {
       console.error(`[voice] stop failed at step ${step}:`, e);
@@ -123,5 +159,5 @@ export function useVoiceCapture() {
     }
   }, [stopRecording]);
 
-  return { isRecording, isLoadingModel, isTranscribing, audioLevel, error, start, stop };
+  return { isRecording, isStarting, isLoadingModel, isTranscribing, audioLevel, error, start, stop };
 }

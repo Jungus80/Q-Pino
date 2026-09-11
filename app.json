@@ -13,8 +13,7 @@
       "appleTeamId": "33M83H9SVB",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Se usa el micrófono para dictar observaciones de equipos durante la visita.",
-        "NSCameraUsageDescription": "Se usa la cámara para fotografiar placas y etiquetas de los equipos.",
-        "NSFaceIDUsageDescription": "Protege el acceso a las observaciones capturadas en este dispositivo."
+        "NSCameraUsageDescription": "Se usa la cámara para fotografiar placas y etiquetas de los equipos."
       }
     },
     "android": {
@@ -56,7 +55,6 @@
       "@qvac/sdk/expo-plugin",
       "@siteed/audio-studio",
       "expo-image-picker",
-      "expo-local-authentication",
       "expo-asset"
     ],
     "experiments": {

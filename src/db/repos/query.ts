@@ -18,6 +18,7 @@ function fromRow(row: any): QueryEquipmentRow {
     lastVerifiedAt: row.last_verified_at,
     countryIso: row.institution_country,
     city: row.institution_city,
+    region: row.institution_region,
   };
 }
 

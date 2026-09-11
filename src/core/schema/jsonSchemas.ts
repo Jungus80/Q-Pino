@@ -23,6 +23,7 @@
 //     to emit one.
 
 import { MODALITIES } from './observation';
+import { QUERY_GROUP_BYS, QUERY_METRICS, QUERY_ORDERS } from '../query/dsl';
 
 const FIELD_STATUS_ENUM = ['Confirmado', 'Reportado', 'Estimado', 'Desconocido'] as const;
 const UNKNOWN_STRING_NOTE = 'Use "" (empty string) if not mentioned in the text — never omit this key.';
@@ -114,20 +115,29 @@ export const QUERY_DSL_SCHEMA = {
   schema: {
     type: 'object',
     additionalProperties: false,
-    required: ['region', 'country', 'city', 'modality', 'manufacturer'],
+    required: ['region', 'country', 'city', 'modality', 'manufacturer', 'institution'],
     properties: {
       region: { type: 'array', items: { type: 'string' } },
-      country: { type: 'array', items: { type: 'string' }, description: 'ISO-3166 alpha-2 codes.' },
+      country: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Country names exactly as written in the question (free text, normalized later).',
+      },
       city: { type: 'array', items: { type: 'string' } },
       modality: { type: 'array', items: { type: 'string', enum: [...MODALITIES] } },
       manufacturer: { type: 'array', items: { type: 'string' } },
+      institution: { type: 'array', items: { type: 'string' } },
       minAge: { type: 'number' },
       maxAge: { type: 'number' },
       minConfidence: { type: 'number' },
+      maxConfidence: { type: 'number' },
       incomplete: { type: 'boolean' },
       stale: { type: 'boolean' },
-      groupBy: { type: 'string', enum: ['country', 'city', 'modality', 'manufacturer'] },
-      metric: { type: 'string', enum: ['count', 'avgAge', 'confidence'] },
+      renewalDue: { type: 'boolean' },
+      groupBy: { type: 'string', enum: [...QUERY_GROUP_BYS] },
+      metric: { type: 'string', enum: [...QUERY_METRICS] },
+      limit: { type: 'integer' },
+      order: { type: 'string', enum: [...QUERY_ORDERS] },
     },
   },
 } as const;

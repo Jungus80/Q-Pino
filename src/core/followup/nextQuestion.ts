@@ -1,4 +1,5 @@
-import type { Modality, NormalizedEquipment } from '../schema/observation';
+import type { NormalizedEquipment } from '../schema/observation';
+import { MODALITY_LABEL } from '../labels';
 
 // Value weights from the architecture plan: which missing field is worth asking about
 // first. Manufacturer narrows renewal/support decisions the most; serial is the least
@@ -18,19 +19,6 @@ export type FollowUpQuestion = {
   question: string;
 };
 
-const MODALITY_LABEL: Record<Modality, string> = {
-  MR: 'resonador',
-  CT: 'tomógrafo',
-  US: 'ecógrafo',
-  XR: 'equipo de rayos X',
-  MG: 'mamógrafo',
-  PET_CT: 'PET-CT',
-  SPECT: 'SPECT',
-  NM: 'equipo de medicina nuclear',
-  ANGIO: 'angiógrafo',
-  MONITORING: 'monitor',
-  OTHER: 'equipo',
-};
 
 const QUESTION_TEMPLATE: Record<FollowUpField, (label: string) => string> = {
   manufacturer: (label) => `¿Sabes el fabricante del ${label}?`,

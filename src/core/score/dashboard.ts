@@ -1,5 +1,6 @@
 import { computeConfidence } from './confidence';
 import { renewalThresholdYears } from '../normalize/catalog';
+import { ageMidpointYears } from '../normalize/age';
 import type { FieldStatus, Modality } from '../schema/observation';
 
 export type DashboardEquipmentInput = {
@@ -24,14 +25,38 @@ export type DashboardInstitutionInput = {
 
 export const AGE_BUCKETS = ['0–3 años', '4–7 años', '8–10 años', '11+ años', 'Desconocida'] as const;
 export type AgeBucket = (typeof AGE_BUCKETS)[number];
-const STALE_DAYS = 365;
+export const STALE_DAYS = 365;
+
+// The definitions below are shared with the Consultas query engine
+// (src/core/query/compile.ts) so a question like "clientes desactualizados" or "equipos
+// para renovar" returns exactly what the Dashboard shows for the same concept.
 
 export function ageMidpoint(lo: number | null, hi: number | null, now: Date): number | null {
-  if (lo == null && hi == null) return null;
-  const currentYear = now.getFullYear();
-  const l = lo ?? hi!;
-  const h = hi ?? lo!;
-  return currentYear - (l + h) / 2;
+  return ageMidpointYears(lo, hi, now);
+}
+
+/** Whole days since `lastVerifiedAt` (floored). */
+export function daysSince(lastVerifiedAt: string, now: Date): number {
+  return Math.floor((now.getTime() - new Date(lastVerifiedAt).getTime()) / 86_400_000);
+}
+
+/** A client is stale when its most recent verification is more than STALE_DAYS old. */
+export function isStale(lastVerifiedAt: string, now: Date): boolean {
+  return daysSince(lastVerifiedAt, now) > STALE_DAYS;
+}
+
+/** How many of manufacturer/model/age are unknown on one equipment record. */
+export function missingFieldCount(eq: { statusManufacturer: FieldStatus; statusModel: FieldStatus; statusAge: FieldStatus }): number {
+  return [eq.statusManufacturer, eq.statusModel, eq.statusAge].filter((s) => s === 'Desconocido').length;
+}
+
+export function isIncompleteEquipment(eq: { statusManufacturer: FieldStatus; statusModel: FieldStatus; statusAge: FieldStatus }): boolean {
+  return missingFieldCount(eq) > 0;
+}
+
+/** Renewal opportunity: known age at or past the modality's renewal threshold. */
+export function isRenewalDue(modality: Modality, ageYears: number | null): boolean {
+  return ageYears != null && ageYears >= renewalThresholdYears(modality);
 }
 
 function ageBucket(ageYears: number | null): AgeBucket {
@@ -103,11 +128,12 @@ export function computeDashboard(
     byAgeBucketMap.set(ageBucket(ageYears), (byAgeBucketMap.get(ageBucket(ageYears)) ?? 0) + units);
 
     const threshold = renewalThresholdYears(eq.modality);
-    if (ageYears != null && ageYears >= threshold) {
-      agingClients.push({ institutionId: inst.id, institutionName: inst.name, modality: eq.modality, ageYears: Math.round(ageYears) });
+    const renewalDue = isRenewalDue(eq.modality, ageYears);
+    if (renewalDue) {
+      agingClients.push({ institutionId: inst.id, institutionName: inst.name, modality: eq.modality, ageYears: Math.round(ageYears!) });
     }
 
-    const missingCount = [eq.statusManufacturer, eq.statusModel, eq.statusAge].filter((s) => s === 'Desconocido').length;
+    const missingCount = missingFieldCount(eq);
     if (missingCount > 0) {
       incompleteByInstitution.set(inst.id, (incompleteByInstitution.get(inst.id) ?? 0) + missingCount);
     }
@@ -122,12 +148,12 @@ export function computeDashboard(
     confidenceSum += confidence.score;
     confidenceCount += 1;
 
-    if (ageYears != null && ageYears >= threshold) {
+    if (renewalDue) {
       renewalOpportunities.push({
         institutionId: inst.id,
         institutionName: inst.name,
         modality: eq.modality,
-        ageYears: Math.round(ageYears),
+        ageYears: Math.round(ageYears!),
         thresholdYears: threshold,
         confidence: confidence.score,
       });
@@ -138,9 +164,9 @@ export function computeDashboard(
   const recentlyUpdated: DashboardData['recentlyUpdated'] = [];
   for (const [institutionId, lastVerifiedAt] of lastVerifiedByInstitution) {
     const inst = institutionById.get(institutionId)!;
-    const days = Math.floor((now.getTime() - new Date(lastVerifiedAt).getTime()) / 86_400_000);
+    const days = daysSince(lastVerifiedAt, now);
     recentlyUpdated.push({ institutionId, institutionName: inst.name, lastVerifiedAt });
-    if (days > STALE_DAYS) staleClients.push({ institutionId, institutionName: inst.name, daysSinceVerified: days });
+    if (isStale(lastVerifiedAt, now)) staleClients.push({ institutionId, institutionName: inst.name, daysSinceVerified: days });
   }
   recentlyUpdated.sort((a, b) => (a.lastVerifiedAt < b.lastVerifiedAt ? 1 : -1));
   staleClients.sort((a, b) => b.daysSinceVerified - a.daysSinceVerified);

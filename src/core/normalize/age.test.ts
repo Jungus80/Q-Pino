@@ -4,14 +4,14 @@ import { ageMidpointYears, parseAge } from './age';
 const NOW = new Date('2026-09-10T00:00:00Z');
 
 describe('parseAge', () => {
-  it('treats a single approximate figure as Estimado with a +/-2yr band', () => {
+  it('treats a single approximate figure as Estimado with exact year calculation', () => {
     const result = parseAge(
       { ageYearsMin: 8, ageYearsMax: 8, installYear: null, evidenceText: 'unos ocho años' },
       NOW
     );
     expect(result.status).toBe('Estimado');
-    expect(result.installYearLo).toBe(2016); // 2026 - (8+2)
-    expect(result.installYearHi).toBe(2020); // 2026 - (8-2)
+    expect(result.installYearLo).toBe(2018); // 2026 - 8
+    expect(result.installYearHi).toBe(2018); // 2026 - 8
   });
 
   it('treats an explicit range as Estimado', () => {

@@ -1,7 +1,9 @@
+import { modalityLabel } from '@/core/labels';
 import { computeConfidence } from '@/core/score/confidence';
 import { getInstitution, type InstitutionRow } from '@/db/repos/institutions';
 import { listEquipmentForInstitution, type EquipmentRow } from '@/db/repos/equipment';
 import { listObservationsForInstitution, type ObservationRow } from '@/db/repos/observations';
+import { Icon } from '@/components/Icon';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
@@ -14,9 +16,9 @@ const BAND_COLOR: Record<'Alta' | 'Media' | 'Baja', string> = {
 };
 
 const SOURCE_LABEL: Record<string, string> = {
-  voice: '🎙️ Voz',
-  text: '⌨️ Texto',
-  photo: '📷 Foto',
+  voice: 'Voz',
+  text: 'Texto',
+  photo: 'Foto',
 };
 
 type ModalityGroup = {
@@ -132,45 +134,59 @@ export default function ClientDetailScreen() {
 
         {groups.map((g) => (
           <View key={g.modality} className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
-            <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-gray-900 font-bold text-base">{g.modality}</Text>
+            <View className="flex-row items-center justify-between mb-1">
+              <Text className="text-gray-900 font-bold text-base">{modalityLabel(g.modality)}</Text>
               <View className={`px-3 py-1 rounded-full ${BAND_COLOR[g.band]}`}>
                 <Text className="text-white text-xs font-bold">
                   {g.band} ({g.score})
                 </Text>
               </View>
             </View>
+            <Text className="text-gray-500 text-xs mb-4">
+              {g.count} {g.count === 1 ? 'unidad' : 'unidades'} · {g.items.length}{' '}
+              {g.items.length === 1 ? 'registro' : 'registros'}
+            </Text>
             <View className="flex-row justify-between mb-4 pb-4 border-b border-gray-200">
               <View>
                 <Text className="text-gray-600 text-xs font-semibold mb-1">Cantidad</Text>
                 <Text className="text-gray-900 text-2xl font-bold">{g.count}</Text>
               </View>
-              <View>
-                <Text className="text-gray-600 text-xs font-semibold mb-1">Antigüedad Aprox.</Text>
+              <View className="items-end">
+                <Text className="text-gray-600 text-xs font-semibold mb-1">Antigüedad aprox.</Text>
                 <Text className="text-gray-900 text-2xl font-bold">{g.ageLabel}</Text>
               </View>
             </View>
-            <View>
-              {g.items.map((item) => (
+            <Text className="text-gray-600 text-xs font-semibold uppercase mb-2">Equipos registrados</Text>
+            {g.items.map((item, index) => {
+              const title = [item.manufacturer, item.model].filter(Boolean).join(' ') || 'Fabricante/modelo desconocido';
+              const units = item.count != null ? `${item.count} ${item.count === 1 ? 'unidad' : 'unidades'}` : null;
+              return (
                 <Pressable
                   key={item.id}
                   onPress={() => router.push(`/equipment/${item.id}`)}
-                  className="flex-row items-center justify-between py-2.5 border-b border-gray-100 last:border-b-0">
-                  <Text className="text-gray-700 text-sm flex-1">
-                    {[item.manufacturer, item.model].filter(Boolean).join(' ') || 'Fabricante/modelo desconocido'}
-                    {item.count != null ? ` · ${item.count} unidad(es)` : ''}
-                  </Text>
-                  <Text className="text-gray-400 text-lg">›</Text>
+                  accessibilityRole="button"
+                  accessibilityLabel={`Ver detalle de ${title}`}
+                  className={`flex-row items-center bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 active:bg-blue-100 ${
+                    index < g.items.length - 1 ? 'mb-2' : ''
+                  }`}>
+                  <View className="flex-1 pr-3">
+                    <Text className="text-gray-900 text-sm font-semibold">{title}</Text>
+                    {units ? <Text className="text-gray-600 text-xs mt-0.5">{units}</Text> : null}
+                  </View>
+                  <View className="flex-row items-center gap-1 shrink-0">
+                    <Text className="text-blue-700 text-sm font-semibold">Ver detalle</Text>
+                    <Icon name="chevron-right" size="md" color="#0066CC" />
+                  </View>
                 </Pressable>
-              ))}
-            </View>
+              );
+            })}
           </View>
         ))}
 
         {comments.length > 0 && (
           <>
             <Text className="text-gray-700 text-sm font-bold uppercase mb-3 mt-6">
-              Comentarios ({comments.length})
+              Observaciones ({comments.length})
             </Text>
             {comments.map((o) => (
               <View key={o.id} className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-2">

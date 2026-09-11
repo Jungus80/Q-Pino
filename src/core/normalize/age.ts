@@ -13,10 +13,9 @@ export type AgeInterval = {
 const CONFIRMED_PATTERN =
   /\b(confirme|confirmado|confirmei|verifique|verificado|verifiquei|vi la placa|lei a placa|segun la placa|leida la placa|read the (plate|label)|checked the (plate|label)|confirmed|verified)\b/;
 
-// A single approximate figure ("unos ocho años") is widened outward by this many
-// years on each side before being converted to an install-year interval, since a
-// point age estimate is never as precise as an explicit range.
-const SINGLE_ESTIMATE_WIDEN_YEARS = 2;
+// A single approximate figure ("unos ocho años") is used directly without widening
+// into an interval, as requested for exact calculations.
+const SINGLE_ESTIMATE_WIDEN_YEARS = 0;
 
 /**
  * Parse an age/installation-year expression into an install-year interval plus a

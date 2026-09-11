@@ -17,6 +17,26 @@ separately). Exits non-zero when either target is missed, so `AUTO_MERGE_THRESHO
 `ASK_THRESHOLD` in `src/core/resolve/institution.ts` can be recalibrated against this set
 whenever they change.
 
+## `npm run eval:query`
+
+Interpretation accuracy for Consultas — natural-language analytics questions → the
+`QueryDsl` that actually runs. Runs the real `src/core/query` code (`analyzeQuestion` +
+`reconcileQueryDsl`) against `golden/query-questions.jsonl`: es/pt/en phrasings, typos,
+every query type (filters, breakdowns, metrics, top-N, renewal, stale/incomplete, single
+client), exclusions and off-topic questions.
+
+Two kinds of case, scored separately:
+
+- **Rules only** (no `llm` field): the model is assumed to have returned nothing, so this
+  is the deterministic floor — what still gets answered when the LLM fails. Target ≥90%.
+- **Regressions** (`llm` field): a bad LLM output observed on the device (every-modality
+  lists, invented countries, placeholder values, invented flags/ages, values in the wrong
+  slot…). The reconciled query must be exactly right. Target 100%.
+
+Comparison is strict over every DSL field, so an unasked-for extra filter fails a case the
+same as a missing one. When a new misreading shows up on the device, add it here with the
+model's actual output in `llm` before fixing it.
+
 ## Why extraction isn't evaluated here
 
 The LLM-extraction half of the pipeline (dictated/typed text → structured JSON) only runs

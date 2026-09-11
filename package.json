@@ -3,6 +3,7 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "dependencies": {
+    "@expo-google-fonts/inter": "^0.4.2",
     "@expo/ui": "~57.0.17",
     "@op-engineering/op-sqlite": "^18.2.1",
     "@qvac/sdk": "^0.19.0",
@@ -20,7 +21,6 @@
     "expo-image": "~57.0.4",
     "expo-image-picker": "~57.0.16",
     "expo-linking": "~57.0.9",
-    "expo-local-authentication": "~57.0.2",
     "expo-router": "~57.0.20",
     "expo-splash-screen": "~57.0.8",
     "expo-status-bar": "~57.0.1",
@@ -63,6 +63,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "eval:resolution": "tsx eval/runResolution.ts",
+    "eval:query": "tsx eval/runQuery.ts",
     "typecheck:eval": "tsc --noEmit -p eval/tsconfig.json"
   },
   "private": true,

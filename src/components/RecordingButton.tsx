@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, View, Text, StyleSheet, Animated } from 'react-native';
 import { useEffect, useRef } from 'react';
+import { Icon } from './Icon';
 
 interface RecordingButtonProps {
   isRecording: boolean;
@@ -8,6 +9,8 @@ interface RecordingButtonProps {
   isTranscribing: boolean;
   onPress: () => void;
   disabled?: boolean;
+  /** Smaller footprint when voice is the secondary capture path. */
+  compact?: boolean;
 }
 
 export function RecordingButton({
@@ -16,13 +19,13 @@ export function RecordingButton({
   isTranscribing,
   onPress,
   disabled = false,
+  compact = false,
 }: RecordingButtonProps) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     if (isRecording) {
-      // Pulse animation while recording
       Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
@@ -57,28 +60,32 @@ export function RecordingButton({
   };
 
   const getBackgroundColor = () => {
-    if (isTranscribing) return '#D1D5DB'; // gray
-    if (isRecording) return '#DC2626'; // red
-    return '#0066CC'; // blue
+    if (isTranscribing) return '#D1D5DB';
+    if (isRecording) return '#DC2626';
+    return '#0066CC';
   };
 
   const getIcon = () => {
-    if (isTranscribing) return '⏳';
-    if (isRecording) return '⏹';
-    return '🎙';
+    if (isTranscribing) return 'loading';
+    if (isRecording) return 'stop';
+    return 'mic';
   };
 
   const getLabel = () => {
-    if (isTranscribing) return 'Transcribiendo...';
-    if (isRecording) return 'Grabando...';
-    return 'Pulsa para grabar';
+    if (isTranscribing) return 'Convirtiendo audio a texto';
+    if (isRecording) return 'Grabando audio';
+    return 'Presiona para iniciar grabación';
   };
 
+  const buttonSize = compact && !isRecording ? 96 : 140;
+  const iconSize = compact && !isRecording ? 'lg' : 'xl';
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, compact && !isRecording && styles.containerCompact]}>
       <Animated.View
         style={[
           styles.buttonWrapper,
+          compact && !isRecording && styles.buttonWrapperCompact,
           {
             transform: [{ scale: scaleAnim }, { scale: pulseAnim }],
           },
@@ -87,18 +94,25 @@ export function RecordingButton({
           onPress={onPress}
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
-          disabled={disabled || isLoading || isTranscribing}
+          // Model loading runs in parallel with recording (see asr.ts) — while
+          // isRecording is true, isLoading/isTranscribing must never block the
+          // stop tap, or the user gets stuck unable to stop until the model
+          // finishes loading in the background.
+          disabled={disabled || (!isRecording && (isLoading || isTranscribing))}
           style={[
             styles.button,
             {
+              width: buttonSize,
+              height: buttonSize,
+              borderRadius: buttonSize / 2,
               backgroundColor: getBackgroundColor(),
-              opacity: disabled || isLoading || isTranscribing ? 0.6 : 1,
+              opacity: disabled || (!isRecording && (isLoading || isTranscribing)) ? 0.6 : 1,
             },
           ]}>
-          <Text style={styles.icon}>{getIcon()}</Text>
+          <Icon name={getIcon()} size={iconSize} color="#FFFFFF" />
         </Pressable>
       </Animated.View>
-      <Text style={styles.label}>{getLabel()}</Text>
+      <Text style={[styles.label, compact && !isRecording && styles.labelCompact]}>{getLabel()}</Text>
     </View>
   );
 }
@@ -108,13 +122,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginVertical: 24,
   },
+  containerCompact: {
+    marginVertical: 8,
+  },
   buttonWrapper: {
     marginBottom: 12,
   },
+  buttonWrapperCompact: {
+    marginBottom: 8,
+  },
   button: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -123,13 +140,14 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
   },
-  icon: {
-    fontSize: 48,
-  },
   label: {
     fontSize: 14,
     fontWeight: '600',
     color: '#374151',
     textAlign: 'center',
+  },
+  labelCompact: {
+    fontSize: 13,
+    color: '#6B7280',
   },
 });

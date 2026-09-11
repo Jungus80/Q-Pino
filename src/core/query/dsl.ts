@@ -1,23 +1,41 @@
 import { z } from 'zod';
 import { MODALITIES } from '../schema/observation';
 
+export const QUERY_GROUP_BYS = ['country', 'city', 'region', 'modality', 'manufacturer', 'institution', 'ageBucket'] as const;
+export type QueryGroupBy = (typeof QUERY_GROUP_BYS)[number];
+export const QUERY_METRICS = ['count', 'clients', 'avgAge', 'confidence'] as const;
+export type QueryMetric = (typeof QUERY_METRICS)[number];
+export const QUERY_ORDERS = ['desc', 'asc'] as const;
+export const MAX_QUERY_LIMIT = 50;
+
 // Mirrors QUERY_DSL_SCHEMA in src/core/schema/jsonSchemas.ts — the grammar the LLM's
 // output is constrained to. The LLM only ever produces this filter object; it never
 // writes SQL. src/core/query/compile.ts is the only thing that turns a QueryDsl into a
 // database query, and it only ever binds these values as parameters.
+//
+// After src/core/query/reconcile.ts, the entity arrays hold canonical values only:
+// country = ISO codes, region = region keys (a code like "LATAM" or a subregion name,
+// see findRegion), city = gazetteer city names (or raw text anchored in the question),
+// manufacturer = catalog names (or raw text anchored in the question).
 export const queryDslSchema = z.object({
   region: z.array(z.string()).default([]),
   country: z.array(z.string()).default([]),
   city: z.array(z.string()).default([]),
   modality: z.array(z.enum(MODALITIES)).default([]),
   manufacturer: z.array(z.string()).default([]),
+  // Client (institution) names, free text — matched fuzzily against institutions.name.
+  institution: z.array(z.string()).default([]),
   minAge: z.number().optional(),
   maxAge: z.number().optional(),
   minConfidence: z.number().optional(),
+  maxConfidence: z.number().optional(),
   incomplete: z.boolean().optional(),
   stale: z.boolean().optional(),
-  groupBy: z.enum(['country', 'city', 'modality', 'manufacturer']).optional(),
-  metric: z.enum(['count', 'avgAge', 'confidence']).default('count'),
+  renewalDue: z.boolean().optional(),
+  groupBy: z.enum(QUERY_GROUP_BYS).optional(),
+  metric: z.enum(QUERY_METRICS).default('count'),
+  limit: z.number().optional(),
+  order: z.enum(QUERY_ORDERS).optional(),
 });
 export type QueryDsl = z.infer<typeof queryDslSchema>;
 
@@ -27,56 +45,25 @@ export const EMPTY_QUERY_DSL: QueryDsl = {
   city: [],
   modality: [],
   manufacturer: [],
+  institution: [],
   metric: 'count',
 };
 
-/** Human-readable chips summarizing an interpreted query, for the editable-filter UI. */
-export function describeQueryDsl(dsl: QueryDsl): string[] {
-  const chips: string[] = [];
-  if (dsl.region.length) chips.push(`Región: ${dsl.region.join(', ')}`);
-  if (dsl.country.length) chips.push(`País: ${dsl.country.join(', ')}`);
-  if (dsl.city.length) chips.push(`Ciudad: ${dsl.city.join(', ')}`);
-  if (dsl.modality.length) chips.push(`Modalidad: ${dsl.modality.join(', ')}`);
-  if (dsl.manufacturer.length) chips.push(`Fabricante: ${dsl.manufacturer.join(', ')}`);
-  if (dsl.minAge !== undefined) chips.push(`Antigüedad ≥ ${dsl.minAge}a`);
-  if (dsl.maxAge !== undefined) chips.push(`Antigüedad ≤ ${dsl.maxAge}a`);
-  if (dsl.minConfidence !== undefined) chips.push(`Confianza ≥ ${dsl.minConfidence}`);
-  if (dsl.incomplete) chips.push('Información incompleta');
-  if (dsl.stale) chips.push('Desactualizado');
-  if (dsl.groupBy) chips.push(`Agrupar por ${dsl.groupBy}`);
-  chips.push(`Métrica: ${dsl.metric}`);
-  return chips;
-}
-
 /**
- * Defensive cleanup for a QueryDsl the LLM just produced. A 2B model under grammar
- * constraint sometimes "fills in" a field instead of leaving it empty when it isn't sure
- * — the same failure mode extraction had, and observed live twice for query parsing:
- * "Equipos por modalidad" came back with every single modality value listed instead of an
- * empty array plus groupBy, and "De qué países tenemos clientes" (asking for a breakdown
- * across ALL countries) came back with country: ["BR"] — silently narrowing a "give me
- * everything, broken down" question down to one country's worth of data, invisibly wrong
- * rather than an obvious failure. The prompt's few-shot examples target this directly, but
- * a second, deterministic safety net catches whatever slips through:
- *  - listing every modality is indistinguishable from "no filter" (an IN clause matching
- *    every row), so collapse it to [] rather than waste the join and mislead the chip UI.
- *  - groupBy on a field is a structural signal from an explicit prompt rule ("por país" →
- *    groupBy: 'country') and much less prone to this failure than a filter array is; a
- *    non-empty filter on the SAME field the model chose to group by makes the grouped
- *    result trivially one row, which is a strong sign the filter is the hallucinated part
- *    — drop that filter rather than silently return a narrower answer than asked.
- *  - minAge: 0 is a mathematical no-op (age is never negative) regardless of intent.
- *  - maxAge: 0 would exclude every real row (nothing installed has zero-yet age), so a
- *    hallucinated 0 is far more likely than a genuine "brand new equipment only" query —
- *    drop it rather than silently return an empty result set.
- *  - country/city/manufacturer are free text (no closed enum to compare a filled array
- *    against, unlike modality), so a third failure mode showed up there specifically: for
- *    "Cuáles son los fabricantes más comunes" the model wrote manufacturer: ["All
- *    manufacturers"] — a placeholder string standing in for "no filter, show me
- *    everything" instead of an actual manufacturer name. That string doesn't match
- *    anything in the database, so the query silently returned zero rows for a perfectly
- *    answerable question. Strip entries that are themselves a "no filter" placeholder
- *    word rather than a real value.
+ * Field-level cleanup for a QueryDsl the LLM just produced — the checks that don't need
+ * the question text. A 2B model under grammar constraint sometimes "fills in" a field
+ * instead of leaving it empty when it isn't sure; observed live:
+ *  - "Equipos por modalidad" came back with every modality listed — indistinguishable
+ *    from "no filter" (an IN clause matching every row), so it collapses to [].
+ *  - "Cuáles son los fabricantes más comunes" came back with manufacturer: ["All
+ *    manufacturers"] — a placeholder standing in for "no filter" that matched nothing and
+ *    returned zero rows. Entries that are themselves a "no filter" word are stripped.
+ *  - minAge: 0 / maxAge: 0 (a no-op and a matches-nothing filter respectively), and
+ *    inverted age ranges.
+ *  - minConfidence given as a fraction (0.8 meaning 80) on a 0-100 scale.
+ * Anything that needs the question itself — whether a value was actually mentioned, e.g.
+ * the invented country: ["BR"] for "De qué países tenemos clientes" — is handled by
+ * src/core/query/reconcile.ts, which runs this first.
  */
 const PLACEHOLDER_FILTER_VALUES = new Set([
   'all',
@@ -84,6 +71,7 @@ const PLACEHOLDER_FILTER_VALUES = new Set([
   'all countries',
   'all cities',
   'all modalities',
+  'all regions',
   'any',
   'anything',
   'everyone',
@@ -92,6 +80,9 @@ const PLACEHOLDER_FILTER_VALUES = new Set([
   'todas',
   'todo',
   'toda',
+  'todos los fabricantes',
+  'todos los paises',
+  'todas las ciudades',
   'cualquiera',
   'ninguno',
   'ninguna',
@@ -101,32 +92,66 @@ const PLACEHOLDER_FILTER_VALUES = new Set([
   'various',
   'varios',
   'varias',
+  'desconocido',
+  'unknown',
+  'otro',
+  'otros',
 ]);
 
-function stripPlaceholders(values: string[]): string[] {
-  return values.filter((v) => !PLACEHOLDER_FILTER_VALUES.has(v.trim().toLowerCase()));
+function cleanStrings(values: string[]): string[] {
+  const out: string[] = [];
+  for (const raw of values) {
+    const v = raw.trim();
+    if (!v || PLACEHOLDER_FILTER_VALUES.has(v.toLowerCase())) continue;
+    if (!out.includes(v)) out.push(v);
+  }
+  return out;
 }
 
 export function sanitizeQueryDsl(dsl: QueryDsl): QueryDsl {
-  const next = { ...dsl };
-  next.country = stripPlaceholders(next.country);
-  next.city = stripPlaceholders(next.city);
-  next.manufacturer = stripPlaceholders(next.manufacturer);
-  next.region = stripPlaceholders(next.region);
+  const next: QueryDsl = { ...dsl };
+  next.country = cleanStrings(next.country);
+  next.city = cleanStrings(next.city);
+  next.manufacturer = cleanStrings(next.manufacturer);
+  next.region = cleanStrings(next.region);
+  next.institution = cleanStrings(next.institution);
+  next.modality = Array.from(new Set(next.modality));
   if (next.modality.length === MODALITIES.length) next.modality = [];
-  if (next.groupBy === 'country' && next.country.length > 0) next.country = [];
-  if (next.groupBy === 'city' && next.city.length > 0) next.city = [];
-  if (next.groupBy === 'modality' && next.modality.length > 0) next.modality = [];
-  if (next.groupBy === 'manufacturer' && next.manufacturer.length > 0) next.manufacturer = [];
-  if (next.minAge === 0) delete next.minAge;
-  if (next.maxAge === 0) delete next.maxAge;
+
+  if (next.minAge !== undefined && !(next.minAge > 0)) delete next.minAge;
+  if (next.maxAge !== undefined && !(next.maxAge > 0)) delete next.maxAge;
   if (next.minAge !== undefined && next.maxAge !== undefined && next.minAge > next.maxAge) {
     delete next.minAge;
     delete next.maxAge;
   }
+
+  // Confidence is a 0-100 score; a bound at or beyond either end filters nothing (or
+  // everything), so it's dropped rather than applied.
+  const scaled = (c: number) => Math.round(c > 0 && c <= 1 ? c * 100 : c);
+  if (next.minConfidence !== undefined) {
+    const c = scaled(next.minConfidence);
+    if (!(c > 0)) delete next.minConfidence;
+    else next.minConfidence = Math.min(100, c);
+  }
+  if (next.maxConfidence !== undefined) {
+    const c = scaled(next.maxConfidence);
+    if (!(c > 0) || c >= 100) delete next.maxConfidence;
+    else next.maxConfidence = c;
+  }
+  if (next.minConfidence !== undefined && next.maxConfidence !== undefined && next.minConfidence > next.maxConfidence) {
+    delete next.minConfidence;
+    delete next.maxConfidence;
+  }
+
+  if (next.limit !== undefined) {
+    const l = Math.round(next.limit);
+    if (!(l >= 1)) delete next.limit;
+    else next.limit = Math.min(MAX_QUERY_LIMIT, l);
+  }
   return next;
 }
 
+/** True when the DSL asks for nothing beyond "all equipment, counted, ungrouped". */
 export function isEmptyQueryDsl(dsl: QueryDsl): boolean {
   return (
     dsl.region.length === 0 &&
@@ -134,11 +159,15 @@ export function isEmptyQueryDsl(dsl: QueryDsl): boolean {
     dsl.city.length === 0 &&
     dsl.modality.length === 0 &&
     dsl.manufacturer.length === 0 &&
+    dsl.institution.length === 0 &&
     dsl.minAge === undefined &&
     dsl.maxAge === undefined &&
     dsl.minConfidence === undefined &&
+    dsl.maxConfidence === undefined &&
     !dsl.incomplete &&
     !dsl.stale &&
-    !dsl.groupBy
+    !dsl.renewalDue &&
+    !dsl.groupBy &&
+    dsl.metric === 'count'
   );
 }

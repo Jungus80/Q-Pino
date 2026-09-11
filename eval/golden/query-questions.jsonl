@@ -1,0 +1,103 @@
+{"id":"modality-breakdown","q":"Equipos por modalidad","expect":{"groupBy":"modality"}}
+{"id":"countries-with-clients","q":"De qué países tenemos clientes","expect":{"groupBy":"country","metric":"clients"}}
+{"id":"top-manufacturers","q":"Cuáles son los fabricantes más comunes","expect":{"groupBy":"manufacturer"}}
+{"id":"manufacturer-alias","q":"Equipos Solara","expect":{"manufacturer":["Solara Health"]}}
+{"id":"region-latam","q":"Clientes en Latinoamérica","expect":{"region":["LATAM"]}}
+{"id":"avg-age-ungrouped","q":"Antigüedad promedio de los resonadores","expect":{"modality":["MR"],"metric":"avgAge"}}
+{"id":"city-no-accent","q":"Tomógrafos en Bogota","expect":{"city":["Bogotá"],"modality":["CT"]}}
+{"id":"filter-and-group-same-field","q":"Resonadores por país en Brasil y México","expect":{"country":["BR","MX"],"modality":["MR"],"groupBy":"country"}}
+{"id":"stale","q":"Clientes desactualizados","expect":{"stale":true}}
+{"id":"incomplete","q":"Clientes con información incompleta","expect":{"incomplete":true}}
+{"id":"renewal","q":"Equipos para renovar","expect":{"renewalDue":true}}
+{"id":"client-count","q":"Cuántos clientes tienen ecógrafos","expect":{"modality":["US"],"metric":"clients"}}
+{"id":"top-n-clients","q":"Top 3 clientes con más equipos","expect":{"groupBy":"institution","limit":3,"order":"desc"}}
+{"id":"age-buckets","q":"Equipos por antigüedad","expect":{"groupBy":"ageBucket"}}
+{"id":"exclusion","q":"Equipos excepto resonadores","expect":{},"minNotes":1}
+{"id":"off-topic","q":"hola","expect":{},"understood":false}
+{"id":"off-topic-2","q":"qué hora es","expect":{},"understood":false}
+{"id":"judgement","q":"¿Cuál es el mejor fabricante?","expect":{},"understood":false}
+{"id":"pt-max-age","q":"Equipamentos com menos de 5 anos no Chile","expect":{"country":["CL"],"maxAge":5}}
+{"id":"en-client-count","q":"How many clients have MRI scanners?","expect":{"modality":["MR"],"metric":"clients"}}
+{"id":"brief-example","q":"Clientes en Brasil con resonadores de más de 7 años","expect":{"country":["BR"],"modality":["MR"],"minAge":7}}
+{"id":"installed-before-year","q":"Equipos instalados antes de 2015","expect":{"minAge":11}}
+{"id":"min-confidence-pct","q":"equipos con confianza mayor a 80%","expect":{"minConfidence":80}}
+{"id":"single-client","q":"Qué equipos tiene el Hospital Andino Sur","expect":{"institution":["Hospital Andino Sur"]}}
+{"id":"age-range","q":"resonadores entre 5 y 10 años","expect":{"modality":["MR"],"minAge":5,"maxAge":10}}
+{"id":"which-country-most","q":"Qué país tiene más equipos","expect":{"groupBy":"country","order":"desc"}}
+{"id":"demonym","q":"hospitales mexicanos","expect":{"country":["MX"]}}
+{"id":"oldest-equipment","q":"los 5 equipos más antiguos","expect":{"groupBy":"institution","metric":"avgAge","limit":5,"order":"desc"}}
+{"id":"clients-without","q":"clientes sin tomógrafos","expect":{},"minNotes":1}
+{"id":"avg-confidence-by-country","q":"Confianza promedio por país","expect":{"groupBy":"country","metric":"confidence"}}
+{"id":"subregion","q":"equipos en sudamerica","expect":{"region":["Sudamérica"]}}
+{"id":"two-breakdowns","q":"equipos por pais y modalidad","expect":{"groupBy":"country"},"minNotes":1}
+{"id":"multi-entity","q":"Mamógrafos Verdant en São Paulo","expect":{"modality":["MG"],"manufacturer":["Verdant Imaging"],"city":["São Paulo"]}}
+{"id":"lowercase-no-accents","q":"ecografos en peru","expect":{"modality":["US"],"country":["PE"]}}
+{"id":"distribution-in-country","q":"Distribución de equipos por fabricante en Colombia","expect":{"country":["CO"],"groupBy":"manufacturer"}}
+{"id":"max-age","q":"Equipos de menos de 3 años","expect":{"maxAge":3}}
+{"id":"number-word","q":"Equipos con más de diez años","expect":{"minAge":10}}
+{"id":"clients-by-city","q":"Clientes por ciudad","expect":{"groupBy":"city","metric":"clients"}}
+{"id":"by-region","q":"Equipos por región","expect":{"groupBy":"region"}}
+{"id":"city-longest-match","q":"Monitores en Ciudad de México","expect":{"modality":["MONITORING"],"city":["Ciudad de México"]}}
+{"id":"stale-by-manufacturer","q":"Resonadores Meridian desactualizados","expect":{"modality":["MR"],"manufacturer":["Meridian Diagnostics"],"stale":true}}
+{"id":"en-renewal","q":"Renewal opportunities for CT scanners","expect":{"modality":["CT"],"renewalDue":true}}
+{"id":"en-by-manufacturer","q":"Equipment by manufacturer","expect":{"groupBy":"manufacturer"}}
+{"id":"pt-client-count","q":"Quantos clientes temos no Brasil?","expect":{"country":["BR"],"metric":"clients"}}
+{"id":"pt-by-modality","q":"Equipamentos por modalidade","expect":{"groupBy":"modality"}}
+{"id":"typos","q":"Resonadors en Colmbia","expect":{"modality":["MR"],"country":["CO"]}}
+{"id":"installed-after-year","q":"Angiógrafos instalados después de 2020","expect":{"modality":["ANGIO"],"maxAge":6}}
+{"id":"high-confidence","q":"Equipos con alta confianza","expect":{"minConfidence":70}}
+{"id":"two-manufacturers","q":"Equipos Northfield y Solara","expect":{"manufacturer":["Northfield Medical","Solara Health"]}}
+{"id":"ascending","q":"Países con menos equipos","expect":{"groupBy":"country","order":"asc"}}
+{"id":"region-eu","q":"Equipos en Europa","expect":{"region":["EU"]}}
+{"id":"plain-total","q":"Cuántos equipos hay?","expect":{}}
+{"id":"obsolete","q":"Tomógrafos obsoletos en Brasil","expect":{"modality":["CT"],"country":["BR"],"renewalDue":true}}
+{"id":"avg-age-by-modality","q":"Antigüedad promedio por modalidad","expect":{"groupBy":"modality","metric":"avgAge"}}
+{"id":"missing-manufacturer","q":"Clientes con equipos sin fabricante","expect":{"incomplete":true}}
+{"id":"client-single-token","q":"Equipos del Centro Médico del Valle","expect":{"institution":["Centro Médico del Valle"]}}
+{"id":"top-n-manufacturers","q":"Top 5 fabricantes","expect":{"groupBy":"manufacturer","limit":5}}
+{"id":"xr-lima","q":"Rayos X en Lima","expect":{"modality":["XR"],"city":["Lima"]}}
+{"id":"pet-ct","q":"PET-CT en Chile","expect":{"modality":["PET_CT"],"country":["CL"]}}
+{"id":"united-states","q":"Equipos en Estados Unidos","expect":{"country":["US"]}}
+{"id":"which-cities","q":"En qué ciudades hay resonadores","expect":{"modality":["MR"],"groupBy":"city"}}
+{"id":"clients-list-not-breakdown","q":"Qué clientes tienen resonadores","expect":{"modality":["MR"]}}
+{"id":"each-client","q":"Cuántos equipos tiene cada cliente","expect":{"groupBy":"institution"}}
+{"id":"llm-all-modalities","q":"Equipos por modalidad","llm":{"modality":["MR","CT","US","XR","MG","PET_CT","SPECT","NM","ANGIO","MONITORING","OTHER"],"minAge":0,"maxAge":0},"expect":{"groupBy":"modality"},"note":"observado en dispositivo (0ec23e7)"}
+{"id":"llm-invented-country","q":"De qué países tenemos clientes","llm":{"country":["BR"],"groupBy":"country"},"expect":{"groupBy":"country","metric":"clients"},"note":"observado en dispositivo (872d0ab)"}
+{"id":"llm-placeholder-manufacturer","q":"Cuáles son los fabricantes más comunes","llm":{"manufacturer":["All manufacturers"]},"expect":{"groupBy":"manufacturer"},"note":"observado en dispositivo (6e2432a)"}
+{"id":"llm-invented-flags","q":"Equipos en Brasil","llm":{"country":["Brasil"],"stale":true,"incomplete":true},"expect":{"country":["BR"]}}
+{"id":"llm-city-as-country","q":"Clientes en Lima","llm":{"country":["Lima"]},"expect":{"city":["Lima"]}}
+{"id":"llm-unknown-country","q":"Clientes en Venezuela","llm":{"country":["Venezuela"]},"expect":{"country":["Venezuela"]},"minNotes":1}
+{"id":"llm-trivial-groupby","q":"Tomógrafos en México","llm":{"country":["México"],"modality":["CT"],"groupBy":"country"},"expect":{"country":["MX"],"modality":["CT"]}}
+{"id":"llm-unknown-manufacturer","q":"Equipos Siemens","llm":{"manufacturer":["Siemens"]},"expect":{"manufacturer":["Siemens"]},"minNotes":1}
+{"id":"llm-invented-metric","q":"Equipos por modalidad","llm":{"groupBy":"modality","metric":"avgAge"},"expect":{"groupBy":"modality"}}
+{"id":"llm-invented-age","q":"Resonadores en Colombia","llm":{"modality":["MR"],"country":["Colombia"],"minAge":10},"expect":{"modality":["MR"],"country":["CO"]}}
+{"id":"llm-region-text","q":"Equipos en Latinoamérica","llm":{"region":["Latinoamérica"]},"expect":{"region":["LATAM"]}}
+{"id":"llm-applies-exclusion","q":"Equipos excepto resonadores","llm":{"modality":["MR"]},"expect":{},"minNotes":1}
+{"id":"llm-generic-in-value","q":"Clientes con equipos Solara","llm":{"manufacturer":["equipos Solara"]},"expect":{"manufacturer":["Solara Health"]}}
+{"id":"llm-generic-word","q":"Top 3 clientes con más equipos","llm":{"groupBy":"institution","limit":3,"institution":["clientes"]},"expect":{"groupBy":"institution","limit":3,"order":"desc"}}
+{"id":"llm-iso-code","q":"Equipos de Solara en Brasil","llm":{"manufacturer":["Solara"],"country":["BR"]},"expect":{"manufacturer":["Solara Health"],"country":["BR"]}}
+{"id":"llm-fraction-confidence","q":"Equipos con confianza mayor a 0.8","llm":{"minConfidence":0.8},"expect":{"minConfidence":80}}
+{"id":"llm-garbage-off-topic","q":"hola","llm":{"country":["Hola"]},"expect":{},"understood":false}
+{"id":"llm-same-field-legit","q":"Resonadores por país en Brasil y México","llm":{"country":["Brasil","México"],"modality":["MR"],"groupBy":"country"},"expect":{"country":["BR","MX"],"modality":["MR"],"groupBy":"country"}}
+{"id":"llm-avg-age-missed","q":"Antigüedad de los tomógrafos por país","llm":{"modality":["CT"],"groupBy":"country"},"expect":{"modality":["CT"],"groupBy":"country","metric":"avgAge"}}
+{"id":"llm-marca-generic","q":"equipos por marca","llm":{"manufacturer":["marca"]},"expect":{"groupBy":"manufacturer"}}
+{"id":"llm-limit-without-group","q":"Equipos en Brasil","llm":{"country":["BR"],"limit":5},"expect":{"country":["BR"]}}
+{"id":"llm-institution-is-city","q":"Equipos en Bogotá","llm":{"institution":["Bogotá"]},"expect":{"city":["Bogotá"]}}
+{"id":"heldout-total-modality","q":"¿Cuántos resonadores hay en total?","expect":{"modality":["MR"]}}
+{"id":"heldout-two-countries","q":"Dame los tomógrafos de Colombia y Perú","expect":{"country":["CO","PE"],"modality":["CT"]}}
+{"id":"heldout-manufacturer-age","q":"equipos de Meridian con más de 8 años","expect":{"manufacturer":["Meridian Diagnostics"],"minAge":8}}
+{"id":"heldout-unverified-clients","q":"¿Qué clientes de Brasil tienen equipos sin verificar?","expect":{"country":["BR"],"stale":true}}
+{"id":"heldout-client-modality","q":"cuantos ecografos tiene la clinica litoral norte","expect":{"modality":["US"],"institution":["Clínica Litoral Norte"]}}
+{"id":"heldout-avg-age-by-manufacturer","q":"Promedio de edad de los equipos por fabricante","expect":{"groupBy":"manufacturer","metric":"avgAge"}}
+{"id":"heldout-max-confidence","q":"equipos con menos de 60% de confianza","expect":{"maxConfidence":60}}
+{"id":"heldout-low-confidence","q":"clientes con confianza baja","expect":{"maxConfidence":39}}
+{"id":"heldout-en-avg-age","q":"What's the average age of ultrasound machines in Brazil?","expect":{"country":["BR"],"modality":["US"],"metric":"avgAge"}}
+{"id":"heldout-pt-manufacturers","q":"Quais fabricantes temos no México?","expect":{"country":["MX"],"groupBy":"manufacturer"}}
+{"id":"heldout-ranking","q":"ranking de países por cantidad de equipos","expect":{"groupBy":"country"}}
+{"id":"heldout-recency-not-age","q":"equipos verificados hace más de un año","expect":{"stale":true}}
+{"id":"heldout-reliability","q":"Qué tan confiables son los datos de Perú","expect":{"country":["PE"],"metric":"confidence"}}
+{"id":"heldout-hemodinamia","q":"cuantas salas de hemodinamia hay","expect":{"modality":["ANGIO"]}}
+{"id":"heldout-city-alias","q":"equipos en rio","expect":{"city":["Rio de Janeiro"]}}
+{"id":"heldout-panama-city","q":"Clientes en la ciudad de Panamá","expect":{"city":["Ciudad de Panamá"]}}
+{"id":"heldout-client-age","q":"¿Cuál es la antigüedad de los equipos de la Clínica Andes Altos?","expect":{"institution":["Clínica Andes Altos"],"metric":"avgAge"}}
+{"id":"llm-recency-as-age","q":"equipos verificados hace más de un año","llm":{"minAge":1,"stale":true},"expect":{"stale":true}}

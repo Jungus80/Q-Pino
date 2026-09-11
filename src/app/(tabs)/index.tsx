@@ -7,14 +7,29 @@ import { matchInstitution } from '@/db/repos/institutions';
 import { extractObservation } from '@/ai/extract';
 import { useVoiceCapture } from '@/ai/asr';
 import { scanPlate } from '@/ai/plateOcr';
+import { useLlmPreload } from '@/hooks/use-llm-preload';
 import { useObserverName } from '@/hooks/use-observer-name';
 import { StatusChip, cycleStatus } from '@/components/StatusChip';
 import { RecordingButton } from '@/components/RecordingButton';
+import { Icon } from '@/components/Icon';
+import { Modal } from '@/components/Modal';
+import { ProfessionalButton } from '@/components/ProfessionalButton';
+import { StickyFooterTabBarInset, TabScreenSafeAreaEdges } from '@/constants/theme';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+/** Floating-card shadow for sticky footers — kept as a plain style object since
+ * NativeWind's `shadow-*` classes don't reliably map to Android's `elevation`. */
+const floatingFooterShadow = {
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.12,
+  shadowRadius: 12,
+  elevation: 6,
+};
 
 /** Promisified 3-way Alert — used for the institution merge confirmation, where the
  * caller needs to actually await the user's choice before deciding how to save. */
@@ -64,6 +79,7 @@ export default function CaptureScreen() {
   const router = useRouter();
   const voice = useVoiceCapture();
   const observer = useObserverName();
+  const { llmPreloading, llmPreloadProgress } = useLlmPreload();
   const [screen, setScreen] = useState<Screen>('input');
   const [text, setText] = useState('');
   const [source, setSource] = useState<'text' | 'voice'>('text');
@@ -74,6 +90,26 @@ export default function CaptureScreen() {
   const [equipment, setEquipment] = useState<NormalizedEquipment[]>([]);
   const [scanningIndex, setScanningIndex] = useState<number | null>(null);
   const [scanProgress, setScanProgress] = useState<number | null>(null);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  // Measured keyboard height (Android only — see note by KeyboardAvoidingView below).
+  const [androidKeyboardHeight, setAndroidKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardVisible(true);
+      setAndroidKeyboardHeight(e?.endCoordinates?.height ?? 0);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardVisible(false);
+      setAndroidKeyboardHeight(0);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   useEffect(() => {
     if (!observer.loading && !observer.isSet) observer.promptForName();
@@ -107,10 +143,11 @@ export default function CaptureScreen() {
       setScreen('review');
     } catch (e: any) {
       console.error('[extract] failed:', e);
-      // ZodError (or anything else structurally unexpected) shouldn't dump raw internals
-      // on screen — a friendly retry prompt is more useful than a JSON issue array.
+      // ZodError (unexpected shape) or SyntaxError (empty/truncated JSON — extractObservation
+      // already retries once, so a second failure here is a persistent decoding issue, not a
+      // fluke) shouldn't dump raw internals on screen — a friendly retry prompt is more useful.
       const friendly =
-        e?.name === 'ZodError'
+        e?.name === 'ZodError' || e instanceof SyntaxError
           ? 'No se pudo interpretar la respuesta del modelo. Intenta de nuevo o reformula el texto.'
           : (e?.message ?? String(e));
       setError(friendly);
@@ -172,6 +209,7 @@ export default function CaptureScreen() {
   }
 
   const followUp = useMemo(() => computeNextQuestion(equipment), [equipment]);
+  const canProceed = Boolean(text.trim()) && !voice.isRecording && !voice.isStarting && !voice.isTranscribing && !voice.isLoadingModel;
 
   async function handleSave() {
     if (!extraction || !institution) return;
@@ -223,19 +261,46 @@ export default function CaptureScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <ScrollView contentContainerClassName="p-4 pb-12" keyboardShouldPersistTaps="handled">
-        <View className="flex-row items-center justify-between mb-2">
-          <View>
+    <SafeAreaView className="flex-1 bg-white" edges={TabScreenSafeAreaEdges}>
+      <KeyboardAvoidingView
+        className="flex-1"
+        // Android: KeyboardAvoidingView's native resize ('height'/'padding') has no
+        // effect here — this screen is hosted inside a NativeTabs/react-native-screens
+        // Fragment whose layout doesn't shrink from RN's animated height style (and
+        // windowSoftInputMode="adjustResize" no longer resizes the window under
+        // edge-to-edge either). So on Android we skip the built-in behavior and instead
+        // apply the measured keyboard height as padding ourselves, below.
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        // NativeTabs bar sits below this screen — offset so the footer clears it.
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        style={{ paddingBottom: androidKeyboardHeight }}>
+        <ScrollView
+          contentContainerClassName="p-4 pb-12"
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag">
+        <View className="flex-row items-center justify-between mb-2 gap-2">
+          <View className="flex-1 shrink">
             <Text className="text-gray-900 text-2xl font-bold">Nueva Observación</Text>
-            <Text className="text-gray-500 text-sm mt-1">Describe lo que viste en la visita</Text>
+            <Text className="text-gray-500 text-sm mt-1">Registra los detalles de la visita</Text>
           </View>
-          <Pressable onPress={observer.promptForName} className="flex-row items-center gap-2 bg-gray-100 rounded-lg px-3 py-2">
-            <Text className="text-gray-700 text-sm font-medium">👤 {observer.name}</Text>
+          <Pressable onPress={observer.promptForName} className="flex-row items-center gap-2 bg-gray-100 rounded-lg px-3 py-2 shrink-0 max-w-[45%]">
+            <Icon name="user" size="sm" color="#374151" />
+            <Text className="text-gray-700 text-sm font-medium" numberOfLines={1}>{observer.name}</Text>
           </Pressable>
         </View>
-        <View className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 mb-4">
-          <Text className="text-blue-700 text-xs font-medium">📱 Modo Offline</Text>
+        <View className="flex-row gap-2 mb-4">
+          <View className="flex-1 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 flex-row items-center gap-2">
+            <Icon name="phone" size="sm" color="#0066CC" />
+            <Text className="text-blue-700 text-xs font-medium">Modo sin conexión</Text>
+          </View>
+          {llmPreloading && (
+            <View className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 flex-row items-center gap-2">
+              <ActivityIndicator color="#0066CC" size="small" />
+              <Text className="text-gray-600 text-xs font-medium">
+                Preparando IA{llmPreloadProgress != null ? ` ${Math.round(llmPreloadProgress)}%` : ''}
+              </Text>
+            </View>
+          )}
         </View>
 
         {screen === 'input' && (
@@ -244,7 +309,7 @@ export default function CaptureScreen() {
               <View className="bg-red-50 border-2 border-red-300 rounded-xl p-4 min-h-32 justify-center">
                 <View className="flex-row items-center mb-3">
                   <View className="w-3 h-3 rounded-full bg-red-500 mr-2 animate-pulse" />
-                  <Text className="text-red-600 text-sm font-semibold">Grabando… habla ahora</Text>
+                  <Text className="text-red-600 text-sm font-semibold">Grabando audio</Text>
                 </View>
                 <Waveform level={voice.audioLevel} />
               </View>
@@ -252,11 +317,11 @@ export default function CaptureScreen() {
               <View className="bg-blue-50 border border-blue-200 rounded-xl p-4 min-h-32 items-center justify-center">
                 <ActivityIndicator color="#0066CC" size="large" />
                 <Text className="text-blue-700 mt-3 text-sm font-medium">
-                  {voice.isLoadingModel ? 'Cargando modelo de voz…' : 'Transcribiendo…'}
+                  {voice.isLoadingModel ? 'Preparando reconocimiento de voz' : 'Convirtiendo audio a texto'}
                 </Text>
               </View>
             ) : (
-              <View>
+              <View className="bg-white border-2 border-gray-200 rounded-xl p-4">
                 <Text className="text-gray-700 text-sm font-semibold mb-2">Descripción de la visita</Text>
                 <TextInput
                   value={text}
@@ -267,47 +332,91 @@ export default function CaptureScreen() {
                   multiline
                   placeholder='Ej: "Estoy en Hospital DemoCare Pacific, en Panamá. Vi dos resonadores, uno parece de unos ocho años."'
                   placeholderTextColor="#9CA3AF"
-                  className="bg-white text-gray-900 rounded-xl p-4 min-h-32 text-base border-2 border-gray-200 focus:border-blue-500"
+                  className="bg-gray-50 text-gray-900 rounded-xl p-4 min-h-32 text-base border border-gray-200 focus:border-blue-500"
                   style={{ textAlignVertical: 'top' }}
                 />
-                <Text className="text-gray-500 text-xs mt-2">Cuéntalo como si hablaras con un colega</Text>
+                <Text className="text-gray-500 text-xs mt-2">Proporciona detalles técnicos y observaciones relevantes</Text>
+
+                <View className="flex-row items-center my-5">
+                  <View className="flex-1 h-px bg-gray-200" />
+                  <Text className="mx-3 text-gray-400 text-xs font-medium uppercase tracking-wide">o graba con voz</Text>
+                  <View className="flex-1 h-px bg-gray-200" />
+                </View>
+
+                {!voice.isRecording && (
+                  <Pressable
+                    onPress={handleToggleVoice}
+                    disabled={voice.isStarting || voice.isLoadingModel || voice.isTranscribing}
+                    className="flex-row items-center justify-center gap-3 py-3 px-4 rounded-xl border-2 border-blue-200 bg-blue-50 active:bg-blue-100">
+                    <View className="w-10 h-10 rounded-full bg-blue-600 items-center justify-center">
+                      {voice.isStarting ? (
+                        <ActivityIndicator color="#FFFFFF" size="small" />
+                      ) : (
+                        <Icon name="mic" size="sm" color="#FFFFFF" />
+                      )}
+                    </View>
+                    <Text className="text-blue-700 font-semibold text-sm">
+                      {voice.isStarting ? 'Iniciando grabación…' : 'Presiona para grabar'}
+                    </Text>
+                  </Pressable>
+                )}
               </View>
             )}
 
-            <RecordingButton
-              isRecording={voice.isRecording}
-              isLoading={voice.isLoadingModel}
-              isTranscribing={voice.isTranscribing}
-              onPress={handleToggleVoice}
-              disabled={voice.isLoadingModel || voice.isTranscribing}
-            />
+            {screen === 'input' && !voice.isRecording && !voice.isLoadingModel && !voice.isTranscribing && (
+              <View className="mt-4 bg-gray-50 border border-gray-200 rounded-xl p-4">
+                <Text className="text-gray-700 text-xs font-bold uppercase mb-2">Para una mejor lectura</Text>
+                {[
+                  'Nombrá el cliente, la ciudad y el país.',
+                  'Indicá cuántos equipos hay, su modalidad y antigüedad aproximada.',
+                  'Mencioná el fabricante o modelo si lo ves en la placa.',
+                ].map((tip) => (
+                  <View key={tip} className="flex-row items-start gap-2 mb-1.5 last:mb-0">
+                    <Icon name="check" size="xs" color="#10B981" />
+                    <Text className="text-gray-600 text-xs flex-1">{tip}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {voice.isRecording && (
+              <RecordingButton
+                isRecording={voice.isRecording}
+                isLoading={voice.isLoadingModel}
+                isTranscribing={voice.isTranscribing}
+                onPress={handleToggleVoice}
+              />
+            )}
 
             {(error || voice.error) && (
-              <View className="bg-red-50 border border-red-200 rounded-lg p-3 mt-4">
-                <Text className="text-red-700 text-sm font-medium">{error ?? voice.error}</Text>
+              <View className="bg-red-50 border border-red-200 rounded-lg p-3 mt-4 flex-row items-start gap-2">
+                <Icon name="error" size="sm" color="#DC2626" />
+                <Text className="text-red-700 text-sm font-medium flex-1">{error ?? voice.error}</Text>
               </View>
             )}
-            <Pressable
-              onPress={handleExtract}
-              disabled={!text.trim() || voice.isRecording || voice.isTranscribing}
-              className={`mt-6 rounded-xl py-4 items-center ${
-                text.trim() && !voice.isRecording && !voice.isTranscribing
-                  ? 'bg-blue-600'
-                  : 'bg-gray-300'
-              }`}>
-              <Text className={`font-semibold text-base ${text.trim() && !voice.isRecording && !voice.isTranscribing ? 'text-white' : 'text-gray-500'}`}>
-                ✓ Extraer información
-              </Text>
-            </Pressable>
+
+            {/* Spacer so scroll content clears the floating sticky CTA below. */}
+            <View style={{ height: 100 }} />
           </>
         )}
 
         {screen === 'extracting' && (
           <View className="items-center py-16">
             <ActivityIndicator color="#0066CC" size="large" />
-            <Text className="text-gray-700 mt-4 text-base font-medium">
-              {progress != null ? `Procesando… ${progress}%` : 'Procesando…'}
+            <Text className="text-gray-900 mt-4 text-base font-semibold">
+              Analizando información
             </Text>
+            <Text className="text-gray-600 mt-2 text-sm">
+              Extrayendo datos relevantes
+            </Text>
+            {progress != null && (
+              <View className="mt-4 w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                <View
+                  className="bg-blue-600 h-full rounded-full"
+                  style={{ width: `${progress}%` }}
+                />
+              </View>
+            )}
           </View>
         )}
 
@@ -341,13 +450,11 @@ export default function CaptureScreen() {
             </View>
 
             {followUp && (
-              <View className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
-                <View className="flex-row items-start gap-3">
-                  <Text className="text-2xl">💡</Text>
-                  <View className="flex-1">
-                    <Text className="text-amber-700 text-xs font-bold uppercase mb-1">Dato Crítico</Text>
-                    <Text className="text-gray-900 text-sm font-medium">{followUp.question}</Text>
-                  </View>
+              <View className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 flex-row items-start gap-3">
+                <Icon name="info" size="md" color="#D97706" />
+                <View className="flex-1">
+                  <Text className="text-amber-700 text-xs font-bold uppercase mb-1">Información Importante</Text>
+                  <Text className="text-gray-900 text-sm font-medium">{followUp.question}</Text>
                 </View>
               </View>
             )}
@@ -375,11 +482,14 @@ export default function CaptureScreen() {
                     <>
                       <ActivityIndicator color="#0066CC" />
                       <Text className="text-blue-700 text-sm font-medium">
-                        {scanProgress !== null ? `Cargando modelo… ${scanProgress}%` : 'Leyendo placa…'}
+                        {scanProgress !== null ? `Preparando análisis… ${scanProgress}%` : 'Reconociendo texto…'}
                       </Text>
                     </>
                   ) : (
-                    <Text className="text-blue-700 text-sm font-medium">📷 Escanear placa para confirmar</Text>
+                    <View className="flex-row items-center gap-2">
+                      <Icon name="camera" size="sm" color="#0066CC" />
+                      <Text className="text-blue-700 text-sm font-medium">Escanear placa para confirmar</Text>
+                    </View>
                   )}
                 </Pressable>
 
@@ -450,31 +560,91 @@ export default function CaptureScreen() {
             ))}
 
             {error && (
-              <View className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
-                <Text className="text-red-700 text-sm font-medium">{error}</Text>
+              <View className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 flex-row items-start gap-2">
+                <Icon name="error" size="sm" color="#DC2626" />
+                <Text className="text-red-700 text-sm font-medium flex-1">{error}</Text>
               </View>
             )}
 
-            <View className="flex-row gap-3 mt-6">
+            {/* Spacer so scroll content clears the sticky review footer. */}
+            <View style={{ height: 100 }} />
+          </View>
+        )}
+        </ScrollView>
+
+        {/* Floating sticky footer for review — save must stay visible above the tab bar. */}
+        {(screen === 'review' || screen === 'saving') && institution && (
+          <View style={{ paddingBottom: keyboardVisible ? 8 : StickyFooterTabBarInset + 16 }}>
+            <View
+              className="mx-4 p-3 bg-white rounded-2xl flex-row gap-3"
+              style={floatingFooterShadow}>
               <Pressable
                 onPress={() => setScreen('input')}
-                className="flex-1 rounded-xl py-3 items-center border-2 border-blue-600">
-                <Text className="text-blue-600 font-semibold">Editar texto</Text>
+                disabled={screen === 'saving'}
+                className="flex-1 rounded-xl py-4 items-center justify-center border border-gray-300 bg-gray-50 active:bg-gray-100">
+                <Text className="text-blue-600 font-semibold text-sm">Volver a Editar</Text>
               </Pressable>
               <Pressable
                 onPress={handleSave}
                 disabled={screen === 'saving'}
-                className="flex-1 rounded-xl py-3 items-center bg-green-600">
+                className="flex-1 rounded-xl py-4 flex-row items-center justify-center gap-2 bg-green-600 active:bg-green-700">
                 {screen === 'saving' ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color="#FFFFFF" size="small" />
                 ) : (
-                  <Text className="text-white font-semibold">💾 Guardar</Text>
+                  <>
+                    <Icon name="save" size="sm" color="#FFFFFF" />
+                    <Text className="text-white font-semibold text-sm">Guardar</Text>
+                  </>
                 )}
               </Pressable>
             </View>
           </View>
         )}
-      </ScrollView>
+
+        {/* Single floating sticky CTA — stays above the tab bar or the keyboard, never duplicated in scroll. */}
+        {screen === 'input' && (
+          <View style={{ paddingBottom: keyboardVisible ? 8 : StickyFooterTabBarInset + 16 }}>
+            <View className="mx-4 p-3 bg-white rounded-2xl" style={floatingFooterShadow}>
+              {!canProceed && (
+                <Text className="text-gray-400 text-xs text-center mb-2">Escribe tu observación para continuar</Text>
+              )}
+              <Pressable
+                onPress={handleExtract}
+                disabled={!canProceed}
+                className={`rounded-xl py-4 flex-row items-center justify-center gap-2 ${
+                  canProceed ? 'bg-blue-600 active:bg-blue-700' : 'bg-gray-200 border border-gray-300'
+                }`}>
+                <Text className={`font-semibold text-base ${canProceed ? 'text-white' : 'text-gray-500'}`}>
+                  Continuar
+                </Text>
+                <Icon name="chevron-right" size="sm" color={canProceed ? '#FFFFFF' : '#9CA3AF'} />
+              </Pressable>
+            </View>
+          </View>
+        )}
+      </KeyboardAvoidingView>
+
+      <Modal
+        visible={observer.androidPrompt.visible}
+        title="Tu nombre"
+        onClose={observer.androidPrompt.cancel}
+        actions={
+          <ProfessionalButton
+            label="Guardar"
+            onPress={observer.androidPrompt.confirm}
+            disabled={!observer.androidPrompt.draft.trim()}
+            fullWidth
+          />
+        }>
+        <Text className="text-gray-500 text-sm mb-3">Aparecerá como el autor de tus observaciones.</Text>
+        <TextInput
+          value={observer.androidPrompt.draft}
+          onChangeText={observer.androidPrompt.setDraft}
+          placeholder="Ej: Juan Pérez"
+          autoFocus
+          className="border border-gray-300 rounded-lg px-3 py-2 text-gray-900"
+        />
+      </Modal>
     </SafeAreaView>
   );
 }

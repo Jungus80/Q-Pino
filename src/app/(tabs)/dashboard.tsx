@@ -2,6 +2,8 @@ import { computeDashboard, ageBucketForRange, type DashboardData } from '@/core/
 import type { Modality } from '@/core/schema/observation';
 import { listInstitutions, type InstitutionRow } from '@/db/repos/institutions';
 import { listAllEquipment, type EquipmentRow } from '@/db/repos/equipment';
+import { Icon } from '@/components/Icon';
+import { TabScreenSafeAreaEdges } from '@/constants/theme';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
@@ -100,7 +102,7 @@ export default function DashboardScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 bg-white items-center justify-center">
+      <SafeAreaView className="flex-1 bg-white items-center justify-center" edges={TabScreenSafeAreaEdges}>
         <ActivityIndicator color="#0066CC" size="large" />
       </SafeAreaView>
     );
@@ -118,15 +120,16 @@ export default function DashboardScreen() {
   const hasActiveFilters = filters.modality || filters.countryIso || filters.ageBucket;
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-white" edges={TabScreenSafeAreaEdges}>
       <ScrollView contentContainerClassName="p-4 pb-12">
         <View className="flex-row items-center justify-between mb-2">
           <View>
-            <Text className="text-gray-900 text-2xl font-bold">Dashboard</Text>
+            <Text className="text-gray-900 text-2xl font-bold">Panel de Control</Text>
             <Text className="text-gray-500 text-sm mt-1">{data.totalEquipment} equipos{hasActiveFilters ? ' (filtrado)' : ' en total'}</Text>
           </View>
           {hasActiveFilters && (
-            <Pressable onPress={() => setFilters(EMPTY_FILTERS)} className="bg-red-50 rounded-lg px-3 py-2">
+            <Pressable onPress={() => setFilters(EMPTY_FILTERS)} className="bg-red-50 rounded-lg px-3 py-2 flex-row items-center gap-1">
+              <Icon name="close" size="sm" color="#DC2626" />
               <Text className="text-red-600 text-xs font-semibold">Limpiar</Text>
             </Pressable>
           )}
@@ -154,12 +157,18 @@ export default function DashboardScreen() {
 
         <View className="flex-row gap-3 mb-6">
           <View className="flex-1 bg-blue-50 rounded-xl p-4 border border-blue-200">
-            <Text className="text-blue-700 text-xs font-semibold mb-2">Confianza Promedio</Text>
+            <View className="flex-row items-center gap-2 mb-2">
+              <Icon name="info" size="sm" color="#0066CC" />
+              <Text className="text-blue-700 text-xs font-semibold">Confianza Promedio</Text>
+            </View>
             <Text className={`text-3xl font-bold ${confidenceColor}`}>{data.avgConfidence}</Text>
             <Text className="text-blue-600 text-xs mt-1">{confidenceBand}</Text>
           </View>
           <View className="flex-1 bg-amber-50 rounded-xl p-4 border border-amber-200">
-            <Text className="text-amber-700 text-xs font-semibold mb-2">Sin Actualizar +1 Año</Text>
+            <View className="flex-row items-center gap-2 mb-2">
+              <Icon name="alert" size="sm" color="#D97706" />
+              <Text className="text-amber-700 text-xs font-semibold">Sin Actualización</Text>
+            </View>
             <Text className="text-3xl font-bold text-amber-600">{data.staleClients.length}</Text>
             <Text className="text-amber-600 text-xs mt-1">clientes</Text>
           </View>
@@ -208,7 +217,7 @@ export default function DashboardScreen() {
         <Section title={`Oportunidades de Renovación (${data.renewalOpportunities.length})`}>
           {data.renewalOpportunities.length === 0 && (
             <View className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-              <Text className="text-gray-600 text-sm">Ningún equipo supera el umbral de renovación.</Text>
+              <Text className="text-gray-600 text-sm">Ningún equipo alcanzó la antigüedad recomendada para renovación.</Text>
             </View>
           )}
           {data.renewalOpportunities.map((r, i) => (
@@ -219,17 +228,18 @@ export default function DashboardScreen() {
               <View className="flex-1">
                 <Text className="text-gray-900 text-sm font-semibold">{r.institutionName}</Text>
                 <Text className="text-gray-600 text-xs mt-1">
-                  {r.modality} · ~{r.ageYears} años (umbral: {r.thresholdYears})
+                  {r.modality} · ~{r.ageYears} años (se recomienda renovar desde los {r.thresholdYears})
                 </Text>
               </View>
-              <View className="bg-amber-100 rounded-lg px-2 py-1">
+              <View className="bg-amber-100 rounded-lg px-2 py-1 flex-row items-center gap-1">
+                <Icon name="alert" size="xs" color="#92400E" />
                 <Text className="text-amber-700 text-xs font-bold">{r.confidence}</Text>
               </View>
             </Pressable>
           ))}
         </Section>
 
-        <Section title={`Clientes con Tecnología Envejecida (${data.agingClients.length})`}>
+        <Section title={`Clientes con Tecnología Antigua (${data.agingClients.length})`}>
           {data.agingClients.length === 0 && (
             <View className="bg-gray-50 border border-gray-200 rounded-lg p-3">
               <Text className="text-gray-600 text-sm">Ninguno.</Text>
@@ -272,7 +282,7 @@ export default function DashboardScreen() {
         </Section>
 
         {data.staleClients.length > 0 && (
-          <Section title={`Alertas de Frescura (${data.staleClients.length})`}>
+          <Section title={`Clientes Desactualizados (${data.staleClients.length})`}>
             {data.staleClients.map((c) => (
               <Pressable key={c.institutionId} onPress={() => router.push(`/clients/${c.institutionId}`)} className="bg-red-50 border border-red-200 rounded-lg p-3 mb-2">
                 <Text className="text-red-700 text-sm font-semibold">{c.institutionName}</Text>

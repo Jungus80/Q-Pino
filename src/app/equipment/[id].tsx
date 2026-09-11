@@ -6,6 +6,7 @@ import { saveEquipmentEdit } from '@/db/editEquipment';
 import { useObserverName } from '@/hooks/use-observer-name';
 import type { FieldStatus } from '@/core/schema/observation';
 import { scanPlate, type PlateScanResult } from '@/ai/plateOcr';
+import { Icon } from '@/components/Icon';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -27,9 +28,9 @@ const FIELD_LABEL: Record<string, string> = {
 };
 
 const SOURCE_LABEL: Record<string, string> = {
-  voice: '🎙️ Voz',
-  text: '⌨️ Texto',
-  photo: '📷 Foto',
+  voice: 'Voz',
+  text: 'Texto',
+  photo: 'Foto',
 };
 
 export default function EquipmentDetailScreen() {
@@ -191,30 +192,48 @@ export default function EquipmentDetailScreen() {
         <Pressable
           onPress={handleScanPlate}
           disabled={scanning}
-          className="bg-blue-600 rounded-xl py-4 items-center mb-4 flex-row justify-center gap-2">
+          className="mb-4 flex-row items-center justify-center gap-2 rounded-xl border-2 border-blue-200 bg-blue-50 py-3.5 active:bg-blue-100">
           {scanning ? (
             <>
-              <ActivityIndicator color="#fff" />
-              <Text className="text-white font-semibold">{scanProgress !== null ? `Cargando… ${scanProgress}%` : 'Leyendo placa…'}</Text>
+              <ActivityIndicator color="#0066CC" size="small" />
+              <Text className="text-blue-700 font-semibold text-sm">
+                {scanProgress != null ? `Analizando placa… ${scanProgress}%` : 'Reconociendo texto…'}
+              </Text>
             </>
           ) : (
-            <Text className="text-white font-semibold text-base">📷 Escanear Placa</Text>
+            <>
+              <Icon name="camera" size="sm" color="#0066CC" />
+              <Text className="text-blue-700 font-semibold text-sm">Escanear placa</Text>
+            </>
           )}
         </Pressable>
 
         {scanResult && (
           <View className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
-            <Text className="text-blue-700 text-xs font-bold uppercase mb-3">Datos Leídos de la Placa</Text>
+            <Text className="text-blue-700 text-xs font-bold uppercase mb-3">Datos Reconocidos</Text>
             {scanResult.manufacturer && <Text className="text-gray-900 text-sm mb-2"><Text className="font-semibold">Fabricante:</Text> {scanResult.manufacturer}</Text>}
             {scanResult.model && <Text className="text-gray-900 text-sm mb-2"><Text className="font-semibold">Modelo:</Text> {scanResult.model}</Text>}
             {scanResult.serial && <Text className="text-gray-900 text-sm mb-2"><Text className="font-semibold">Serial:</Text> {scanResult.serial}</Text>}
             {scanResult.installYear && <Text className="text-gray-900 text-sm mb-3"><Text className="font-semibold">Año:</Text> {scanResult.installYear}</Text>}
             <View className="flex-row gap-2">
-              <Pressable onPress={handleApplyScan} disabled={saving} className="flex-1 bg-blue-600 rounded-lg py-2.5 items-center">
-                <Text className="text-white font-semibold">Aplicar como Confirmado</Text>
+              <Pressable
+                onPress={handleApplyScan}
+                disabled={saving}
+                className="flex-1 flex-row items-center justify-center gap-2 rounded-xl bg-green-600 py-3 active:bg-green-700">
+                {saving ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <>
+                    <Icon name="check" size="sm" color="#FFFFFF" />
+                    <Text className="text-white font-semibold text-sm">Confirmar</Text>
+                  </>
+                )}
               </Pressable>
-              <Pressable onPress={() => setScanResult(null)} className="px-4 py-2.5 items-center">
-                <Text className="text-gray-600 font-semibold">Descartar</Text>
+              <Pressable
+                onPress={() => setScanResult(null)}
+                disabled={saving}
+                className="flex-1 items-center justify-center rounded-xl border border-gray-300 bg-gray-50 py-3 active:bg-gray-100">
+                <Text className="text-blue-600 font-semibold text-sm">Descartar</Text>
               </Pressable>
             </View>
           </View>
@@ -251,13 +270,26 @@ export default function EquipmentDetailScreen() {
 
           <View className="mb-4">
             <Text className="text-gray-700 text-sm font-semibold mb-2">Número de Serie</Text>
-            <TextInput
-              value={serial}
-              onChangeText={setSerial}
-              placeholder="Ej: SN123456"
-              placeholderTextColor="#9CA3AF"
-              className="bg-gray-50 text-gray-900 rounded-lg px-3 py-2 border border-gray-200"
-            />
+            <View className="flex-row items-center gap-2">
+              <TextInput
+                value={serial}
+                onChangeText={setSerial}
+                placeholder="Ej: SN123456"
+                placeholderTextColor="#9CA3AF"
+                className="bg-gray-50 text-gray-900 rounded-lg px-3 py-2 flex-1 border border-gray-200"
+              />
+              <Pressable
+                onPress={handleScanPlate}
+                disabled={scanning}
+                accessibilityLabel="Escanear placa"
+                className="w-11 h-11 rounded-lg border border-blue-200 bg-blue-50 items-center justify-center active:bg-blue-100">
+                {scanning ? (
+                  <ActivityIndicator color="#0066CC" size="small" />
+                ) : (
+                  <Icon name="camera" size="sm" color="#0066CC" />
+                )}
+              </Pressable>
+            </View>
           </View>
 
           <View className="flex-row gap-3 mb-4">
@@ -289,8 +321,18 @@ export default function EquipmentDetailScreen() {
           </View>
         </View>
 
-        <Pressable onPress={handleSave} disabled={saving} className="bg-green-600 rounded-xl py-4 items-center mb-8">
-          {saving ? <ActivityIndicator color="#fff" /> : <Text className="text-white font-semibold text-base">💾 Guardar Cambios</Text>}
+        <Pressable
+          onPress={handleSave}
+          disabled={saving}
+          className="mb-6 flex-row items-center justify-center gap-2 rounded-xl bg-green-600 py-4 active:bg-green-700">
+          {saving ? (
+            <ActivityIndicator color="#FFFFFF" size="small" />
+          ) : (
+            <>
+              <Icon name="save" size="sm" color="#FFFFFF" />
+              <Text className="text-white font-semibold text-base">Guardar Cambios</Text>
+            </>
+          )}
         </Pressable>
 
         <Text className="text-gray-700 text-sm font-bold uppercase mb-3">

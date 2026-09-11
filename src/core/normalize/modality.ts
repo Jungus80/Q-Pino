@@ -92,6 +92,11 @@ for (const modality of MODALITIES) {
   }
 }
 
+/** Every normalized synonym → Modality pair — for the query analyzer's dictionary. */
+export function modalitySynonymEntries(): { name: string; modality: Modality }[] {
+  return Array.from(lookup, ([name, modality]) => ({ name, modality }));
+}
+
 /** Resolve free text (es/pt/en, any casing/accents) to a closed Modality, or null. */
 export function normalizeModality(freeText: string | null | undefined): Modality | null {
   if (!freeText) return null;

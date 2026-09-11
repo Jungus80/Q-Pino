@@ -1,5 +1,7 @@
 import { listInstitutions, type InstitutionRow } from '@/db/repos/institutions';
 import { listAllEquipment } from '@/db/repos/equipment';
+import { Icon } from '@/components/Icon';
+import { TabScreenSafeAreaEdges } from '@/constants/theme';
 import geoData from '../../../assets/geo/latam.simplified.json';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
@@ -87,17 +89,17 @@ export default function MapScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 bg-white items-center justify-center">
+      <SafeAreaView className="flex-1 bg-white items-center justify-center" edges={TabScreenSafeAreaEdges}>
         <ActivityIndicator color="#0066CC" size="large" />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-white" edges={TabScreenSafeAreaEdges}>
       <ScrollView contentContainerClassName="p-4 pb-12">
-        <Text className="text-gray-900 text-2xl font-bold mb-1">Mapa</Text>
-        <Text className="text-gray-500 text-sm mb-4">Toca un país para ver sus ciudades y clientes.</Text>
+        <Text className="text-gray-900 text-2xl font-bold mb-1">Mapa de Cobertura</Text>
+        <Text className="text-gray-500 text-sm mb-4">Selecciona un país para ver detalles.</Text>
 
         <View className="bg-white border border-gray-200 rounded-xl overflow-hidden mb-4">
           <Svg width={MAP_WIDTH} height={MAP_HEIGHT}>
@@ -146,8 +148,9 @@ export default function MapScreen() {
                   <Pressable
                     key={inst.id}
                     onPress={() => router.push(`/clients/${inst.id}`)}
-                    className="bg-white border border-gray-200 rounded-lg p-3 mb-2">
-                    <Text className="text-gray-900 text-sm font-semibold">{inst.name}</Text>
+                    className="bg-white border border-gray-200 rounded-lg p-3 mb-2 flex-row items-center justify-between">
+                    <Text className="text-gray-900 text-sm font-semibold flex-1">{inst.name}</Text>
+                    <Icon name="chevron-right" size="sm" color="#D1D5DB" />
                   </Pressable>
                 ))}
               </View>
@@ -159,7 +162,8 @@ export default function MapScreen() {
             )}
           </View>
         ) : (
-          <View className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <View className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex-row items-center gap-2">
+            <Icon name="info" size="sm" color="#0066CC" />
             <Text className="text-blue-700 text-sm font-medium">Selecciona un país en el mapa o en la lista de arriba.</Text>
           </View>
         )}

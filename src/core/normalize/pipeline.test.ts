@@ -145,7 +145,7 @@ describe('normalizeObservation — equipment', () => {
     });
     const { equipment } = normalizeObservation(extraction, TRANSCRIPT, NOW);
     expect(equipment[0].fieldStatus.age).toBe('Estimado');
-    expect(equipment[0].installYearLo).toBe(2016);
-    expect(equipment[0].installYearHi).toBe(2020);
+    expect(equipment[0].installYearLo).toBe(2018);
+    expect(equipment[0].installYearHi).toBe(2018);
   });
 });

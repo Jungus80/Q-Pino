@@ -9,7 +9,62 @@ export type PlateExtraction = {
   catalogModelId: string | null;
 };
 
-const SERIAL_RE = /\b(?:S\s*\/?\s*N|SER(?:IAL)?|SERIE)[:\s#-]*([A-Z0-9][A-Z0-9-]{3,19})\b/i;
+// SIN is a common OCR misread of S/N (slash read as I).
+const SERIAL_LABEL_RE = /^(?:S\s*\/?\s*N|SIN|SN|SER(?:IAL)?|SERIE)\b/i;
+const SERIAL_INLINE_RE = /(?:S\s*\/?\s*N|SIN|SN|SER(?:IAL)?|SERIE)[:\s#-]+([A-Z0-9][A-Z0-9-]{3,24})\b/i;
+const SERIAL_VALUE_RE = /^[A-Z0-9][A-Z0-9-]{3,24}$/i;
+// Standalone nameplate serial like MD2012-00487 — not a REF/MOD catalog code.
+const SERIAL_STANDALONE_RE = /^[A-Z]{2,5}\d{4}-\d{3,8}$/i;
+
+function extractSerial(lines: string[]): string | null {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!SERIAL_LABEL_RE.test(line)) continue;
+
+    const sameLine = line.match(SERIAL_INLINE_RE);
+    if (sameLine) return joinSerialContinuation(sameLine[1], lines, i + 1);
+
+    // Label and value often land in separate OCR blocks ("S/N:" then "MD2012-00487").
+    let value = lines[i + 1]?.trim() ?? '';
+    if (SERIAL_VALUE_RE.test(value)) {
+      if (value.endsWith('-') && lines[i + 2]?.trim()) {
+        value = value + lines[i + 2].trim();
+      }
+      return normalizeSerial(value);
+    }
+  }
+
+  const joined = lines.join('\n');
+  const inline = joined.match(SERIAL_INLINE_RE);
+  if (inline) {
+    const labelIndex = lines.findIndex((l) => SERIAL_LABEL_RE.test(l.trim()));
+    return joinSerialContinuation(inline[1], lines, labelIndex >= 0 ? labelIndex + 1 : 0);
+  }
+
+  for (const line of lines) {
+    const t = line.trim();
+    if (/^(?:REF|MOD|MFG|FAB|A[ÑN]O|YEAR|FECHA|220V|MADE)/i.test(t)) continue;
+    if (SERIAL_STANDALONE_RE.test(t)) return normalizeSerial(t);
+  }
+
+  return null;
+}
+
+/** OCR often splits "MD2012-00487" into "MD2012-" + "00487" across blocks. */
+function joinSerialContinuation(partial: string, lines: string[], fromIndex: number): string {
+  let serial = normalizeSerial(partial);
+  if (!serial.endsWith('-')) return serial;
+  for (let i = fromIndex; i < lines.length; i++) {
+    const next = lines[i].trim().replace(/\s/g, '');
+    if (/^\d{3,8}$/.test(next)) return serial + next;
+    if (SERIAL_VALUE_RE.test(next) && !next.endsWith('-')) return normalizeSerial(next);
+  }
+  return serial.replace(/-+$/, '');
+}
+
+function normalizeSerial(raw: string): string {
+  return raw.replace(/\s/g, '').toUpperCase();
+}
 const MODEL_RE = /\b(?:REF|MOD(?:EL[O]?)?)[:\s#-]*([A-Z0-9][A-Za-z0-9 .-]{1,29}?)\s*$/im;
 // A manufacture/install date on a nameplate is usually printed near a label like
 // "FAB", "MFG", "AÑO", "YEAR", or "FECHA" — a bare 19xx/20xx elsewhere on the plate is
@@ -28,8 +83,7 @@ const YEAR_RE = /\b(?:FAB(?:RICA(?:CI[OÓ]N)?)?|MFG|MANUFACTURED?|A[ÑN]O|YEAR|F
 export function parsePlateText(lines: string[], modality?: Modality | null): PlateExtraction {
   const joined = lines.join('\n');
 
-  const serialMatch = joined.match(SERIAL_RE);
-  const serial = serialMatch ? serialMatch[1] : null;
+  const serial = extractSerial(lines);
 
   const modelLabelMatch = joined.match(MODEL_RE);
   let model: string | null = null;

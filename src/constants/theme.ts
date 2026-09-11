@@ -65,6 +65,20 @@ export const Fonts = Platform.select({
   },
 });
 
+/**
+ * Explicit weight -> font family map. Android's stock Roboto only has true
+ * Normal/Bold static faces, so numeric fontWeight on intermediate values
+ * (500/600) gets rounded up to bold there. Inter ships real static faces per
+ * weight, loaded via expo-font in the root layout, so text renders at the
+ * intended weight on every platform.
+ */
+export const FontWeights = {
+  regular: 'Inter_400Regular',
+  medium: 'Inter_500Medium',
+  semiBold: 'Inter_600SemiBold',
+  bold: 'Inter_700Bold',
+} as const;
+
 export const Spacing = {
   half: 2,
   one: 4,
@@ -75,5 +89,20 @@ export const Spacing = {
   six: 64,
 } as const;
 
-export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;
+
+/**
+ * Edges for <SafeAreaView> on tab screens. Android's NativeTabs already wraps
+ * screen content in its own bottom-edge SafeAreaView (reserving the real,
+ * measured tab bar height) — adding 'bottom' here too double-reserves that
+ * space. iOS's NativeTabs does not do this, so it still needs the default.
+ */
+export const TabScreenSafeAreaEdges = Platform.select({
+  android: ['top', 'left', 'right'] as const,
+  default: undefined,
+});
+
+/** Extra bottom padding a sticky footer needs to clear the tab bar. iOS's
+ * NativeTabs doesn't reserve tab-bar space for screen content the way
+ * Android's does, so only iOS needs an explicit push here. */
+export const StickyFooterTabBarInset = Platform.select({ ios: 49, android: 0 }) ?? 0;
