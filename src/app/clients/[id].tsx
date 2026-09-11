@@ -4,15 +4,24 @@ import { getInstitution, type InstitutionRow } from '@/db/repos/institutions';
 import { listEquipmentForInstitution, type EquipmentRow } from '@/db/repos/equipment';
 import { listObservationsForInstitution, type ObservationRow } from '@/db/repos/observations';
 import { Icon } from '@/components/Icon';
+import { Screen } from '@/components/kit/Screen';
+import { EmptyState } from '@/components/kit/EmptyState';
+import { Card } from '@/components/ui/card';
+import { Spinner } from '@/components/ui/spinner';
+import { Text } from '@/components/ui/text';
+import { View } from '@/components/ui/view';
+import { useColor } from '@/hooks/useColor';
+import { FontFamily } from '@/theme/fonts';
+import { CORNERS } from '@/theme/globals';
+import { useAppStyles } from '@/theme/useAppStyles';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Pressable, ScrollView } from 'react-native';
 
-const BAND_COLOR: Record<'Alta' | 'Media' | 'Baja', string> = {
-  Alta: 'bg-emerald-500',
-  Media: 'bg-amber-500',
-  Baja: 'bg-red-500',
+const BAND_KEY: Record<'Alta' | 'Media' | 'Baja', 'green' | 'orange' | 'red'> = {
+  Alta: 'green',
+  Media: 'orange',
+  Baja: 'red',
 };
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -79,6 +88,11 @@ function groupByModality(rows: EquipmentRow[], now: Date): ModalityGroup[] {
 export default function ClientDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { styles, primary } = useAppStyles();
+  const green = useColor('green');
+  const orange = useColor('orange');
+  const red = useColor('red');
+  const bandColor = { green, orange, red };
   const [loading, setLoading] = useState(true);
   const [institution, setInstitution] = useState<InstitutionRow | null>(null);
   const [groups, setGroups] = useState<ModalityGroup[]>([]);
@@ -101,62 +115,58 @@ export default function ClientDetailScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 bg-white items-center justify-center">
-        <ActivityIndicator color="#0066CC" size="large" />
-      </SafeAreaView>
+      <Screen centered>
+        <Spinner size="lg" />
+      </Screen>
     );
   }
 
   if (!institution) {
     return (
-      <SafeAreaView className="flex-1 bg-white items-center justify-center">
-        <Text className="text-gray-600">Cliente no encontrado.</Text>
-      </SafeAreaView>
+      <Screen centered>
+        <Text variant="caption">Cliente no encontrado.</Text>
+      </Screen>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <ScrollView contentContainerClassName="p-4 pb-12">
-        <Text className="text-gray-900 text-2xl font-bold">{institution.name}</Text>
-        <Text className="text-gray-600 text-sm mt-1 mb-1">
+    <Screen>
+      <ScrollView contentContainerStyle={[styles.pad, styles.padBottom]}>
+        <Text variant="title">{institution.name}</Text>
+        <Text variant="caption" style={{ marginTop: 6 }}>
           {[institution.site, institution.city, institution.countryIso].filter(Boolean).join(' · ') || 'Ubicación desconocida'}
         </Text>
-        <Text className="text-gray-500 text-xs mb-6">
+        <Text variant="caption" style={{ marginBottom: 20 }}>
           Cliente desde {new Date(institution.createdAt).toLocaleDateString('es')}
         </Text>
 
-        {groups.length === 0 && (
-          <View className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-            <Text className="text-gray-600">Todavía no hay equipos registrados para este cliente.</Text>
-          </View>
-        )}
+        {groups.length === 0 && <EmptyState>Todavía no hay equipos registrados para este cliente.</EmptyState>}
 
         {groups.map((g) => (
-          <View key={g.modality} className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
-            <View className="flex-row items-center justify-between mb-1">
-              <Text className="text-gray-900 font-bold text-base">{modalityLabel(g.modality)}</Text>
-              <View className={`px-3 py-1 rounded-full ${BAND_COLOR[g.band]}`}>
-                <Text className="text-white text-xs font-bold">
+          <Card key={g.modality} style={{ marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+              <Text variant="subtitle">{modalityLabel(g.modality)}</Text>
+              <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: CORNERS, backgroundColor: bandColor[BAND_KEY[g.band]] }}>
+                <Text style={{ color: '#FFFCF6', fontFamily: FontFamily.sansSemi, fontSize: 12 }}>
                   {g.band} ({g.score})
                 </Text>
               </View>
             </View>
-            <Text className="text-gray-500 text-xs mb-4">
+            <Text variant="caption" style={{ marginBottom: 14 }}>
               {g.count} {g.count === 1 ? 'unidad' : 'unidades'} · {g.items.length}{' '}
               {g.items.length === 1 ? 'registro' : 'registros'}
             </Text>
-            <View className="flex-row justify-between mb-4 pb-4 border-b border-gray-200">
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: styles.card.borderColor }}>
               <View>
-                <Text className="text-gray-600 text-xs font-semibold mb-1">Cantidad</Text>
-                <Text className="text-gray-900 text-2xl font-bold">{g.count}</Text>
+                <Text variant="caption">Cantidad</Text>
+                <Text style={styles.monoLg}>{g.count}</Text>
               </View>
-              <View className="items-end">
-                <Text className="text-gray-600 text-xs font-semibold mb-1">Antigüedad aprox.</Text>
-                <Text className="text-gray-900 text-2xl font-bold">{g.ageLabel}</Text>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text variant="caption">Antigüedad aprox.</Text>
+                <Text variant="title">{g.ageLabel}</Text>
               </View>
             </View>
-            <Text className="text-gray-600 text-xs font-semibold uppercase mb-2">Equipos registrados</Text>
+            <Text variant="caption" style={{ marginBottom: 8 }}>Equipos registrados</Text>
             {g.items.map((item, index) => {
               const title = [item.manufacturer, item.model].filter(Boolean).join(' ') || 'Fabricante/modelo desconocido';
               const units = item.count != null ? `${item.count} ${item.count === 1 ? 'unidad' : 'unidades'}` : null;
@@ -166,41 +176,40 @@ export default function ClientDetailScreen() {
                   onPress={() => router.push(`/equipment/${item.id}`)}
                   accessibilityRole="button"
                   accessibilityLabel={`Ver detalle de ${title}`}
-                  className={`flex-row items-center bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 active:bg-blue-100 ${
-                    index < g.items.length - 1 ? 'mb-2' : ''
-                  }`}>
-                  <View className="flex-1 pr-3">
-                    <Text className="text-gray-900 text-sm font-semibold">{title}</Text>
-                    {units ? <Text className="text-gray-600 text-xs mt-0.5">{units}</Text> : null}
+                  style={[styles.listRow, index < g.items.length - 1 ? { marginBottom: 8 } : { marginBottom: 0 }]}
+                >
+                  <View style={{ flex: 1, paddingRight: 12 }}>
+                    <Text variant="subtitle">{title}</Text>
+                    {units ? <Text variant="caption">{units}</Text> : null}
                   </View>
-                  <View className="flex-row items-center gap-1 shrink-0">
-                    <Text className="text-blue-700 text-sm font-semibold">Ver detalle</Text>
-                    <Icon name="chevron-right" size="md" color="#0066CC" />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Text style={[styles.ghostChipText, { color: primary }]}>Ver detalle</Text>
+                    <Icon name="chevron-right" size="md" color={primary} />
                   </View>
                 </Pressable>
               );
             })}
-          </View>
+          </Card>
         ))}
 
         {comments.length > 0 && (
           <>
-            <Text className="text-gray-700 text-sm font-bold uppercase mb-3 mt-6">
+            <Text variant="caption" style={{ marginBottom: 12, marginTop: 8 }}>
               Observaciones ({comments.length})
             </Text>
             {comments.map((o) => (
-              <View key={o.id} className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-2">
-                <Text className="text-gray-900 text-sm mb-2">{o.comments}</Text>
-                <Text className="text-gray-600 text-xs">
+              <Card key={o.id} style={{ marginBottom: 8 }}>
+                <Text variant="body" style={{ marginBottom: 8 }}>{o.comments}</Text>
+                <Text variant="caption">
                   {new Date(o.createdAt).toLocaleDateString('es', { year: 'numeric', month: 'short', day: 'numeric' })}
                   {' · '}
                   {o.observerId} · {SOURCE_LABEL[o.source] ?? o.source}
                 </Text>
-              </View>
+              </Card>
             ))}
           </>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 }

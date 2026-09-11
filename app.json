@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "QVAC",
+    "name": "Q-Pino",
     "slug": "QVAC",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -8,7 +8,7 @@
     "scheme": "qvac",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/images/icon.png",
       "bundleIdentifier": "io.qvac.installedbase",
       "appleTeamId": "33M83H9SVB",
       "infoPlist": {
@@ -19,7 +19,7 @@
     "android": {
       "package": "io.qvac.installedbase",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#F3EFE6",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -39,9 +39,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#F3EFE6",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 72
         }
       ],
       [
@@ -55,7 +55,8 @@
       "@qvac/sdk/expo-plugin",
       "@siteed/audio-studio",
       "expo-image-picker",
-      "expo-asset"
+      "expo-asset",
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true,

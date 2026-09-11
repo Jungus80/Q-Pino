@@ -1,56 +1,40 @@
-# Welcome to your Expo app 👋
+# QVAC — Vigilancia del parque instalado (on-device)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+App móvil (iOS / Android) para capturar observaciones de equipos médicos en campo, resolverlas a clientes y equipos, y consultar el parque en lenguaje natural. **Toda la inferencia corre en el dispositivo con [QVAC](https://qvac.tether.io) (`@qvac/sdk`)**: extracción, consultas, Whisper y OCR de placa. No hay API de inferencia en la nube.
 
-## Get started
+## Requisito técnico (art. 10)
 
-1. Install dependencies
+| Capacidad | Motor QVAC | Dónde corre |
+|-----------|------------|-------------|
+| Extraer observación / Consultas | Qwen (llama.cpp) | On-device (GPU iOS / CPU Android) |
+| Voz → texto | Whisper | On-device |
+| Lectura de placa | OCR ggml | On-device |
 
-   ```bash
-   npm install
-   ```
+La primera vez se **descargan los pesos** al teléfono (no es inferencia remota). Después la app funciona sin red.
 
-2. Start the app
+## Base preexistente (art. 11)
 
-   ```bash
-   npx expo start
-   ```
+Producto sustancial construido en la ventana del hackathon. Se reutilizan plantillas y librerías de terceros, declaradas aquí:
 
-In the output, you'll find options to open the app in a
+| Origen | Uso |
+|--------|-----|
+| [Expo](https://expo.dev) / `create-expo-app` | Plantilla React Native, routing (`expo-router`), splash, build nativo |
+| [@qvac/sdk](https://qvac.tether.io) (Tether) | Inferencia local (LLM, Whisper, OCR) — requisito del evento |
+| [BNA UI](https://ui.ahmedbna.com) (componentes copiados al repo) | Kit de UI (botones, cards, toast, etc.) |
+| [@siteed/audio-studio](https://github.com/deeeed/expo-audio-stream) | Grabación de voz (no se usa el recorder de Expo Audio) |
+| Google Fonts (Newsreader, IBM Plex Sans/Mono) vía `@expo-google-fonts` | Tipografía |
+| NativeWind / Tailwind (resto de la plantilla) | Dependencia residual; las pantallas de producto no usan `className` |
+| Zod, op-sqlite, lucide-react-native, react-native-reanimated, d3-geo | Utilidades, SQLite, iconos, motion, mapa |
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+Asistentes de IA de programación: usados durante el desarrollo (art. 11.d).
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Cómo correr
 
 ```bash
-npm run reset-project
+npm install
+npx expo run:ios
+# o
+npx expo run:android
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-### Other setup steps
-
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+La primera ejecución descarga los modelos (hace falta internet). Build compartible Android: `cd android && ./gradlew assembleRelease`.

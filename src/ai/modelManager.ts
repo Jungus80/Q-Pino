@@ -1,8 +1,11 @@
 import {
+  downloadAsset,
+  OCR_LATIN,
   loadModel,
   QWEN3_5_0_8B_MULTIMODAL_Q4_K_M,
   QWEN3_5_2B_MULTIMODAL_Q4_K_M,
   unloadModel,
+  WHISPER_SMALL_Q8_0,
   type ModelProgressUpdate,
 } from '@qvac/sdk';
 import { Platform } from 'react-native';
@@ -44,6 +47,155 @@ export const LLM_LOAD_PARAMS: LoadParams = {
 
 let llmPreloadPromise: Promise<string> | null = null;
 
+export type ModelPrefetchStatus = 'idle' | 'running' | 'done' | 'error';
+
+export type ModelPrefetchState = {
+  status: ModelPrefetchStatus;
+  label: string;
+  index: number;
+  total: number;
+  percentage: number | null;
+};
+
+const PREFETCH_ASSETS: { label: string; src: unknown }[] = [
+  { label: 'lenguaje', src: LLM_MODEL_SRC },
+  { label: 'voz', src: WHISPER_SMALL_Q8_0 },
+  { label: 'placa', src: OCR_LATIN },
+];
+
+let prefetchPromise: Promise<void> | null = null;
+const downloadedKeys = new Set<string>();
+const pendingDownloads = new Map<string, Promise<void>>();
+const prefetchListeners = new Set<(state: ModelPrefetchState) => void>();
+let prefetchState: ModelPrefetchState = {
+  status: 'idle',
+  label: '',
+  index: 0,
+  total: PREFETCH_ASSETS.length,
+  percentage: null,
+};
+
+function assetKey(src: unknown): string {
+  return JSON.stringify(src);
+}
+
+function emitPrefetch(next: ModelPrefetchState) {
+  prefetchState = next;
+  for (const listener of prefetchListeners) listener(next);
+}
+
+export function subscribeModelPrefetch(listener: (state: ModelPrefetchState) => void): () => void {
+  prefetchListeners.add(listener);
+  listener(prefetchState);
+  return () => {
+    prefetchListeners.delete(listener);
+  };
+}
+
+async function ensureAssetDownloaded(src: unknown, onProgress?: OnProgress): Promise<void> {
+  if (Platform.OS === 'web') return;
+  const key = assetKey(src);
+  if (downloadedKeys.has(key)) return;
+  const pending = pendingDownloads.get(key);
+  if (pending) return pending;
+
+  const promise = downloadAsset({
+    assetSrc: src as Parameters<typeof downloadAsset>[0]['assetSrc'],
+    onProgress: (p: ModelProgressUpdate) => onProgress?.(p.percentage),
+  })
+    .then(() => {
+      downloadedKeys.add(key);
+    })
+    .finally(() => {
+      if (pendingDownloads.get(key) === promise) pendingDownloads.delete(key);
+    });
+
+  pendingDownloads.set(key, promise);
+  return promise;
+}
+
+/**
+ * Downloads LLM, Whisper and OCR weights to disk on iOS/Android without loading them
+ * into RAM. Safe to call from root layout — dedupes and no-ops after the first run
+ * (or when the files are already cached).
+ */
+export function prefetchOnDeviceModels(): Promise<void> {
+  if (Platform.OS === 'web') return Promise.resolve();
+  if (prefetchPromise) return prefetchPromise;
+
+  prefetchPromise = (async () => {
+    emitPrefetch({
+      status: 'running',
+      label: PREFETCH_ASSETS[0].label,
+      index: 0,
+      total: PREFETCH_ASSETS.length,
+      percentage: 0,
+    });
+    try {
+      let anyFailed = false;
+      for (let i = 0; i < PREFETCH_ASSETS.length; i++) {
+        const asset = PREFETCH_ASSETS[i];
+        emitPrefetch({
+          status: 'running',
+          label: asset.label,
+          index: i,
+          total: PREFETCH_ASSETS.length,
+          percentage: 0,
+        });
+        try {
+          await ensureAssetDownloaded(asset.src, (percentage) => {
+            emitPrefetch({
+              status: 'running',
+              label: asset.label,
+              index: i,
+              total: PREFETCH_ASSETS.length,
+              percentage,
+            });
+          });
+        } catch {
+          anyFailed = true;
+        }
+      }
+      if (anyFailed) {
+        emitPrefetch({
+          status: 'error',
+          label: '',
+          index: downloadedKeys.size,
+          total: PREFETCH_ASSETS.length,
+          percentage: null,
+        });
+      } else {
+        emitPrefetch({
+          status: 'done',
+          label: '',
+          index: PREFETCH_ASSETS.length,
+          total: PREFETCH_ASSETS.length,
+          percentage: 100,
+        });
+      }
+    } catch {
+      emitPrefetch({ ...prefetchState, status: 'error' });
+    }
+  })().catch(() => {
+    // Keep prefetchPromise so layout remounts don't restart a download in flight.
+  });
+
+  return prefetchPromise;
+}
+
+/** Clears a failed prefetch so the user can retry once they have a connection. */
+export function retryPrefetchOnDeviceModels(): Promise<void> {
+  prefetchPromise = null;
+  emitPrefetch({
+    status: 'idle',
+    label: '',
+    index: 0,
+    total: PREFETCH_ASSETS.length,
+    percentage: null,
+  });
+  return prefetchOnDeviceModels();
+}
+
 function llmKey(): string {
   return `${LLM_LOAD_PARAMS.modelType}:${JSON.stringify(LLM_LOAD_PARAMS.modelSrc)}`;
 }
@@ -78,13 +230,17 @@ export async function loadExclusive(params: LoadParams): Promise<string> {
   const key = `${params.modelType}:${JSON.stringify(params.modelSrc)}`;
 
   if (currentModelId && currentModelType === key) return currentModelId;
+  if (pendingLoad && pendingLoad.key === key) return pendingLoad.promise;
+
+  await ensureAssetDownloaded(params.modelSrc, params.onProgress).catch(() => {});
+
+  if (currentModelId && currentModelType === key) return currentModelId;
+  if (pendingLoad && pendingLoad.key === key) return pendingLoad.promise;
 
   // Dedupe concurrent callers requesting the same model (e.g. tab-focus preload
   // racing a user-triggered extraction) so they share one loadModel() call instead
   // of each starting their own — loading the same ~GB model twice at once would
   // otherwise double GPU/memory pressure on the device.
-  if (pendingLoad && pendingLoad.key === key) return pendingLoad.promise;
-
   if (currentModelId && currentModelType !== key) {
     await unloadModel({ modelId: currentModelId, clearStorage: false }).catch(() => {});
     currentModelId = null;

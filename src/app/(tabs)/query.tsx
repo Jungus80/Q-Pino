@@ -13,12 +13,22 @@ import type { QueryDsl } from '@/core/query/dsl';
 import { describeQueryDsl, formatMetricValue, GROUP_BY_LABEL, METRIC_LABEL, plural } from '@/core/labels';
 import { countryLabel } from '@/core/normalize/geo';
 import { Icon } from '@/components/Icon';
-import { TabScreenSafeAreaEdges } from '@/constants/theme';
+import { Screen } from '@/components/kit/Screen';
+import { ScreenHeader } from '@/components/kit/ScreenHeader';
+import { FilterChip } from '@/components/kit/FilterChip';
+import { EmptyState } from '@/components/kit/EmptyState';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Spinner } from '@/components/ui/spinner';
+import { Text } from '@/components/ui/text';
+import { View } from '@/components/ui/view';
 import { useLlmPreload } from '@/hooks/use-llm-preload';
+import { useAppStyles } from '@/theme/useAppStyles';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView } from 'react-native';
 
 const EXAMPLES = [
   'Clientes en Brasil con resonadores de más de 7 años',
@@ -44,6 +54,7 @@ type Result = {
 
 export default function QueryScreen() {
   const router = useRouter();
+  const { styles, muted, primary, primaryFg, orange, red } = useAppStyles();
   const { llmPreloading } = useLlmPreload();
   const [question, setQuestion] = useState('');
   const [phase, setPhase] = useState<'idle' | 'parsing' | 'computing'>('idle');
@@ -201,14 +212,8 @@ export default function QueryScreen() {
 
   function renderExamples() {
     return EXAMPLES.map((ex) => (
-      <Pressable
-        key={ex}
-        onPress={() => {
-          setQuestion(ex);
-          handleAsk(ex);
-        }}
-        className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-2">
-        <Text className="text-blue-700 text-sm font-medium">{ex}</Text>
+      <Pressable key={ex} onPress={() => { setQuestion(ex); handleAsk(ex); }} style={[styles.listRow, { marginBottom: 8 }]}>
+        <Text variant="body" style={{ color: primary }}>{ex}</Text>
       </Pressable>
     ));
   }
@@ -216,116 +221,109 @@ export default function QueryScreen() {
   const askDisabled = busy || summarizing || !question.trim();
 
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={TabScreenSafeAreaEdges}>
+    <Screen>
       <KeyboardAvoidingView
-        className="flex-1"
-        // Android: see the matching note in (tabs)/index.tsx — native resize doesn't
-        // take effect here, so we apply the measured keyboard height as padding below.
+        style={{ flex: 1, paddingBottom: androidKeyboardHeight }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        // NativeTabs bar sits below this screen — offset so the footer clears it.
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-        style={{ paddingBottom: androidKeyboardHeight }}>
-        <View className="flex-row items-center justify-between px-4 pt-4 pb-2">
-          <View className="flex-1 pr-2">
-            <Text className="text-gray-900 text-2xl font-bold">Búsqueda Avanzada</Text>
-            <Text className="text-gray-500 text-sm mt-1">Preguntá en lenguaje natural sobre el parque instalado.</Text>
-          </View>
-          {canClear && (
-            <Pressable onPress={clearAll} className="flex-row items-center gap-1 bg-gray-100 rounded-lg px-3 py-2">
-              <Icon name="plus" size="xs" color="#374151" />
-              <Text className="text-gray-700 text-xs font-semibold">Nueva consulta</Text>
-            </Pressable>
+      >
+        <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
+          <ScreenHeader
+            title="Búsqueda avanzada"
+            subtitle="Preguntá en lenguaje natural sobre todos los equipos."
+            right={
+              canClear ? (
+                <Pressable onPress={clearAll} style={styles.ghostChip}>
+                  <Icon name="plus" size="xs" color={muted} />
+                  <Text style={styles.ghostChipText}>Nueva consulta</Text>
+                </Pressable>
+              ) : null
+            }
+          />
+          {llmPreloading && (
+            <Text variant="caption" style={{ marginBottom: 8 }}>Preparando IA para respuestas más rápidas…</Text>
           )}
         </View>
 
-        {llmPreloading && (
-          <View className="flex-row items-center gap-2 px-4 pb-2">
-            <ActivityIndicator color="#0066CC" size="small" />
-            <Text className="text-gray-500 text-xs">Preparando IA para respuestas más rápidas…</Text>
-          </View>
-        )}
-
-        <ScrollView className="flex-1" contentContainerClassName="px-4 pb-4" keyboardShouldPersistTaps="handled">
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16 }} keyboardShouldPersistTaps="handled">
           {!result && !notUnderstood && !busy && (
-            <View className="mb-6">
-              <Text className="text-gray-700 text-sm font-bold uppercase mb-3">Sugerencias</Text>
+            <View style={{ marginBottom: 24 }}>
+              <Text variant="caption" style={{ marginBottom: 12 }}>Sugerencias</Text>
               {renderExamples()}
             </View>
           )}
 
           {busy && (
-            <View className="items-center py-12">
-              <ActivityIndicator color="#0066CC" size="large" />
-              <Text className="text-gray-900 text-base font-semibold mt-4">
+            <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+              <Spinner size="lg" />
+              <Text variant="subtitle" style={{ marginTop: 16 }}>
                 {phase === 'computing' ? 'Calculando resultado' : 'Analizando información'}
               </Text>
-              <Text className="text-gray-600 text-sm mt-2">
+              <Text variant="caption" style={{ marginTop: 8 }}>
                 {phase === 'computing' ? 'Procesando datos' : 'Interpretando tu pregunta'}
               </Text>
             </View>
           )}
 
           {error && (
-            <View className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 flex-row items-start gap-2">
-              <Icon name="error" size="sm" color="#DC2626" />
-              <Text className="text-red-700 text-sm font-medium flex-1">{error}</Text>
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+              <Icon name="error" size="sm" color={red} />
+              <Text style={[styles.bodySm, { color: red, flex: 1 }]}>{error}</Text>
             </View>
           )}
 
           {notUnderstood && !busy && (
             <>
-              <View className="bg-gray-100 rounded-xl rounded-br-sm p-3 mb-3 self-end">
-                <Text className="text-gray-700 text-sm">{notUnderstood}</Text>
-              </View>
-              <View className="bg-gray-50 border border-gray-200 rounded-xl rounded-tl-sm p-4 mb-4">
-                <Text className="text-gray-800 text-base leading-6">
-                  No entendí la pregunta. Puedo responder sobre equipos y clientes del parque: modalidades, fabricantes, países, ciudades,
+              <Card style={{ alignSelf: 'flex-end', marginBottom: 10, maxWidth: '92%' }}>
+                <Text variant="body">{notUnderstood}</Text>
+              </Card>
+              <Card style={{ marginBottom: 12 }}>
+                <Text variant="body">
+                  No entendí la pregunta. Puedo responder sobre equipos y clientes: modalidades, fabricantes, países, ciudades,
                   antigüedad, confianza, renovación y datos incompletos o desactualizados. Probá con alguno de estos:
                 </Text>
-              </View>
+              </Card>
               {renderExamples()}
             </>
           )}
 
           {result && answer && !busy && (
             <>
-              <View className="bg-gray-100 rounded-xl rounded-br-sm p-3 mb-3 self-end">
-                <Text className="text-gray-700 text-sm">{result.question}</Text>
+              <Card style={{ alignSelf: 'flex-end', marginBottom: 10, maxWidth: '92%' }}>
+                <Text variant="body">{result.question}</Text>
                 {result.refinementNote && (
-                  <Text className="text-gray-500 text-xs mt-1 italic">Ajustado: {result.refinementNote}</Text>
+                  <Text variant="caption" style={{ marginTop: 6, fontStyle: 'italic' }}>Ajustado: {result.refinementNote}</Text>
                 )}
-              </View>
+              </Card>
 
-              <View className="bg-blue-600 rounded-xl rounded-tl-sm p-4 mb-3">
-                <Text className="text-white text-base leading-6">{result.text}</Text>
+              <Card style={{ marginBottom: 12 }}>
+                <Text variant="body">{result.text}</Text>
                 {summarizing && (
-                  <View className="flex-row items-center gap-2 mt-2">
-                    <ActivityIndicator color="#fff" size="small" />
-                    <Text className="text-blue-100 text-xs">Redactando respuesta…</Text>
+                  <View style={{ marginTop: 10 }}>
+                    <Skeleton height={12} />
+                    <Text variant="caption" style={{ marginTop: 6 }}>Redactando respuesta…</Text>
                   </View>
                 )}
-              </View>
+              </Card>
 
               {result.notes.map((note) => (
-                <View key={note} className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-2 flex-row items-start gap-2">
-                  <Icon name="alert" size="sm" color="#D97706" />
-                  <Text className="text-amber-800 text-sm flex-1">{note}</Text>
+                <View key={note} style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+                  <Icon name="alert" size="sm" color={orange} />
+                  <Text variant="caption" style={{ flex: 1 }}>{note}</Text>
                 </View>
               ))}
 
-              <Text className="text-gray-700 text-sm font-bold uppercase mb-3 mt-3">Filtros Aplicados</Text>
-              <View className="flex-row flex-wrap gap-2 mb-6">
-                {chips.length === 0 && <Text className="text-gray-500 text-sm">Sin filtros: todo el parque.</Text>}
+              <Text variant="caption" style={{ marginBottom: 10, marginTop: 12 }}>Filtros aplicados</Text>
+              <View style={[styles.wrap, { marginBottom: 20 }]}>
+                {chips.length === 0 && <Text variant="caption">Sin filtros: todos los equipos.</Text>}
                 {chips.map(({ key, label }) => (
-                  <Pressable key={key} onPress={() => removeChip(key)} className="bg-blue-100 rounded-full px-3 py-1.5">
-                    <Text className="text-blue-700 text-xs font-semibold">{label} ×</Text>
-                  </Pressable>
+                  <FilterChip key={key} selected label={`${label} ×`} onPress={() => removeChip(key)} />
                 ))}
               </View>
 
               {answer.groups && result.dsl.groupBy ? (
-                <View className="mb-6">
-                  <Text className="text-gray-700 text-sm font-bold uppercase mb-3">
+                <View style={{ marginBottom: 24 }}>
+                  <Text variant="caption" style={{ marginBottom: 12 }}>
                     {METRIC_LABEL[result.dsl.metric]} por {GROUP_BY_LABEL[result.dsl.groupBy].singular} (
                     {answer.groups.length < answer.groupsTotal ? `${answer.groups.length} de ${answer.groupsTotal}` : answer.groupsTotal})
                   </Text>
@@ -336,92 +334,78 @@ export default function QueryScreen() {
                         key={g.key}
                         disabled={!isClient}
                         onPress={() => router.push(`/clients/${g.key}`)}
-                        className="bg-white border border-gray-200 rounded-lg p-3 mb-2 flex-row justify-between items-center">
-                        <View className="flex-1 pr-3">
-                          <Text className="text-gray-900 text-sm font-semibold">{g.label}</Text>
+                        style={styles.listRow}
+                      >
+                        <View style={{ flex: 1, paddingRight: 12 }}>
+                          <Text variant="subtitle">{g.label}</Text>
                           {result.dsl.metric !== 'count' && (
-                            <Text className="text-gray-500 text-xs mt-0.5">{plural(g.equipmentCount, 'equipo', 'equipos')}</Text>
+                            <Text variant="caption">{plural(g.equipmentCount, 'equipo', 'equipos')}</Text>
                           )}
                         </View>
-                        <View className="bg-blue-100 rounded-lg px-2.5 py-1">
-                          <Text className="text-blue-700 text-sm font-bold">{formatMetricValue(result.dsl.metric, g.value)}</Text>
+                        <View style={styles.ghostChip}>
+                          <Text style={styles.ghostChipText}>{formatMetricValue(result.dsl.metric, g.value)}</Text>
                         </View>
                       </Pressable>
                     );
                   })}
-                  {answer.groups.length === 0 && (
-                    <View className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                      <Text className="text-gray-600 text-sm">Sin resultados.</Text>
-                    </View>
-                  )}
+                  {answer.groups.length === 0 && <EmptyState>Sin resultados.</EmptyState>}
                 </View>
               ) : (
-                <View className="mb-6">
-                  <Text className="text-gray-700 text-sm font-bold uppercase mb-1">
+                <View style={{ marginBottom: 24 }}>
+                  <Text variant="caption" style={{ marginBottom: 4 }}>
                     {plural(answer.equipmentTotal, 'equipo', 'equipos')} en {plural(answer.clientTotal, 'cliente', 'clientes')}
                   </Text>
                   {(result.dsl.metric === 'avgAge' || result.dsl.metric === 'confidence') && (
-                    <Text className="text-gray-600 text-sm mb-2">
+                    <Text variant="caption" style={{ marginBottom: 8 }}>
                       {METRIC_LABEL[result.dsl.metric]}: {formatMetricValue(result.dsl.metric, answer.overall)}
                     </Text>
                   )}
-                  <View className="mt-2">
-                    {answer.institutions.map((inst) => (
-                      <Pressable
-                        key={inst.id}
-                        onPress={() => router.push(`/clients/${inst.id}`)}
-                        className="bg-white border border-gray-200 rounded-lg p-3 mb-2 flex-row justify-between items-center">
-                        <View className="flex-1 pr-3">
-                          <Text className="text-gray-900 text-sm font-semibold">{inst.name}</Text>
-                          <Text className="text-gray-600 text-xs mt-1">
-                            {inst.city ?? '—'}, {inst.countryIso ? countryLabel(inst.countryIso) : '—'}
-                          </Text>
-                        </View>
-                        <Text className="text-gray-500 text-xs">{plural(inst.equipmentCount, 'equipo', 'equipos')}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                  {answer.clientTotal === 0 && (
-                    <View className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                      <Text className="text-gray-600 text-sm">Sin resultados.</Text>
-                    </View>
-                  )}
+                  {answer.institutions.map((inst) => (
+                    <Pressable key={inst.id} onPress={() => router.push(`/clients/${inst.id}`)} style={styles.listRow}>
+                      <View style={{ flex: 1, paddingRight: 12 }}>
+                        <Text variant="subtitle">{inst.name}</Text>
+                        <Text variant="caption">
+                          {inst.city ?? '—'}, {inst.countryIso ? countryLabel(inst.countryIso) : '—'}
+                        </Text>
+                      </View>
+                      <Text variant="caption">{plural(inst.equipmentCount, 'equipo', 'equipos')}</Text>
+                    </Pressable>
+                  ))}
+                  {answer.clientTotal === 0 && <EmptyState>Sin resultados.</EmptyState>}
                 </View>
               )}
             </>
           )}
         </ScrollView>
 
-        <View className="border-t border-gray-200 bg-white px-3 pt-3" style={{ paddingBottom: 12 }}>
+        <View style={{ borderTopWidth: 1, borderTopColor: styles.card.borderColor, paddingHorizontal: 12, paddingTop: 12, paddingBottom: 12 }}>
           {(phase === 'parsing' || phase === 'computing' || summarizing) && (
-            <Text className="text-gray-500 text-xs mb-2">
+            <Text variant="caption" style={{ marginBottom: 8 }}>
               {phase === 'parsing' ? 'Interpretando tu pregunta…' : phase === 'computing' ? 'Procesando datos…' : 'Redactando respuesta…'}
             </Text>
           )}
-          <View className="flex-row items-end gap-2">
-            <TextInput
-              value={question}
-              onChangeText={setQuestion}
-              placeholder="Preguntá algo, ej: equipos por modalidad"
-              placeholderTextColor="#9CA3AF"
-              className="flex-1 text-gray-900 text-base bg-gray-100 rounded-2xl px-4 py-3"
-              multiline
-              editable={!busy && !summarizing}
-            />
-            <Pressable
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Input
+                value={question}
+                onChangeText={setQuestion}
+                placeholder="Preguntá algo, ej: equipos por modalidad"
+                multiline
+                editable={!busy && !summarizing}
+              />
+            </View>
+            <Button
+              size="icon"
               onPress={() => handleAsk()}
               disabled={askDisabled}
-              className="w-11 h-11 rounded-full items-center justify-center"
-              style={{ backgroundColor: askDisabled ? '#E5E7EB' : '#0066CC' }}>
-              {busy ? (
-                <ActivityIndicator color={askDisabled ? '#9CA3AF' : '#fff'} size="small" />
-              ) : (
-                <Icon name="search" size="md" color={askDisabled ? '#9CA3AF' : '#fff'} />
-              )}
-            </Pressable>
+              loading={busy}
+              style={{ backgroundColor: askDisabled ? styles.card.borderColor : primary }}
+            >
+              <Icon name="search" size="md" color={askDisabled ? muted : primaryFg} />
+            </Button>
           </View>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </Screen>
   );
 }

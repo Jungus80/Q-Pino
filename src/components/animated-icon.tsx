@@ -1,43 +1,35 @@
 import { Image } from 'expo-image';
 import * as SplashScreen from 'expo-splash-screen';
-import { useState } from 'react';
-import { Dimensions, StyleSheet, View, Text } from 'react-native';
+import { useRef, useState } from 'react';
+import { StyleSheet, View, Text } from 'react-native';
 import Animated, { Easing, Keyframe } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
-const INITIAL_SCALE_FACTOR = Dimensions.get('screen').height / 90;
-const DURATION = 400;
+const HOLD_MS = 700;
+const FADE_MS = 350;
 
 export function AnimatedSplashOverlay() {
   const [animate, setAnimate] = useState(false);
   const [visible, setVisible] = useState(true);
+  const holdStarted = useRef(false);
 
   if (!visible) return null;
 
   const splashKeyframe = new Keyframe({
     0: {
-      transform: [{ scale: 1 }],
       opacity: 1,
-    },
-    20: {
-      opacity: 1,
-    },
-    70: {
-      opacity: 0,
-      easing: Easing.elastic(0.7),
     },
     100: {
       opacity: 0,
-      transform: [{ scale: 1 }],
-      easing: Easing.elastic(0.7),
+      easing: Easing.out(Easing.cubic),
     },
   });
 
-  const image = <Image style={styles.image} source={require('@/assets/images/expo-logo.png')} />;
+  const image = <Image style={styles.image} source={require('@/assets/images/icon.png')} />;
 
   return animate ? (
     <Animated.View
-      entering={splashKeyframe.duration(DURATION).withCallback((finished) => {
+      entering={splashKeyframe.duration(FADE_MS).withCallback((finished) => {
         'worklet';
         if (finished) {
           scheduleOnRN(setVisible, false);
@@ -46,34 +38,36 @@ export function AnimatedSplashOverlay() {
       style={styles.splashOverlay}>
       <View style={styles.content}>
         {image}
-        <Text style={styles.title}>QVAC</Text>
-        <Text style={styles.subtitle}>Vigilancia Médica</Text>
+        <Text style={styles.title}>Q-Pino</Text>
       </View>
     </Animated.View>
   ) : (
     <View
       onLayout={() => {
+        if (holdStarted.current) return;
+        holdStarted.current = true;
         SplashScreen.hideAsync().finally(() => {
-          setAnimate(true);
+          setTimeout(() => setAnimate(true), HOLD_MS);
         });
       }}
       style={styles.splashOverlay}>
       <View style={styles.content}>
         {image}
-        <Text style={styles.title}>QVAC</Text>
-        <Text style={styles.subtitle}>Vigilancia Médica</Text>
+        <Text style={styles.title}>Q-Pino</Text>
       </View>
     </View>
   );
 }
 
+const DURATION = 700;
+
 const keyframe = new Keyframe({
   0: {
-    transform: [{ scale: INITIAL_SCALE_FACTOR }],
+    transform: [{ scale: 1.15 }],
   },
   100: {
     transform: [{ scale: 1 }],
-    easing: Easing.elastic(0.7),
+    easing: Easing.out(Easing.cubic),
   },
 });
 
@@ -136,20 +130,21 @@ const styles = StyleSheet.create({
     zIndex: 100,
   },
   image: {
-    width: 96,
-    height: 90,
-    marginBottom: 24,
+    width: 72,
+    height: 72,
+    marginBottom: 12,
+    borderRadius: 16,
   },
   background: {
     borderRadius: 40,
-    experimental_backgroundImage: `linear-gradient(180deg, #3C9FFE, #0274DF)`,
+    backgroundColor: '#1F5C56',
     width: 128,
     height: 128,
     position: 'absolute',
   },
   splashOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: '#0066CC',
+    backgroundColor: '#F3EFE6',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
@@ -160,15 +155,8 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 8,
-    letterSpacing: 1,
-  },
-  subtitle: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#E0F2FE',
-    letterSpacing: 0.5,
+    fontFamily: 'Newsreader_700Bold',
+    color: '#1A1714',
+    letterSpacing: 0.4,
   },
 });

@@ -4,7 +4,7 @@
 // this is free-text prose, not structured data the app parses — grounding, not extraction.
 // The reply is only shown if every number in it appears in the data block
 // (summaryIsGrounded in src/core/query/answer.ts); otherwise the templated answer stays.
-export const QUERY_SUMMARY_SYSTEM_PROMPT = `Eres un asistente que responde preguntas sobre un parque de equipos médicos instalados en clientes hospitalarios, en 1 a 3 frases, en el mismo idioma de la pregunta.
+export const QUERY_SUMMARY_SYSTEM_PROMPT = `Eres un asistente que responde preguntas sobre todos los equipos médicos instalados en clientes hospitalarios, en 1 a 3 frases, en el mismo idioma de la pregunta.
 
 Se te da la pregunta original y los datos YA CALCULADOS. Tu única tarea es redactar una respuesta natural y directa usando ESOS datos exactos.
 

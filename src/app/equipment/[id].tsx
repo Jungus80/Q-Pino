@@ -7,11 +7,19 @@ import { useObserverName } from '@/hooks/use-observer-name';
 import type { FieldStatus } from '@/core/schema/observation';
 import { scanPlate, type PlateScanResult } from '@/ai/plateOcr';
 import { Icon } from '@/components/Icon';
+import { Screen } from '@/components/kit/Screen';
+import { EmptyState } from '@/components/kit/EmptyState';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Spinner } from '@/components/ui/spinner';
+import { Text } from '@/components/ui/text';
+import { View } from '@/components/ui/view';
+import { useToast } from '@/components/ui/toast';
+import { useAppStyles } from '@/theme/useAppStyles';
 import * as ImagePicker from 'expo-image-picker';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, Pressable, ScrollView, TextInput } from 'react-native';
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('es', { year: 'numeric', month: 'short', day: 'numeric' });
@@ -33,9 +41,30 @@ const SOURCE_LABEL: Record<string, string> = {
   photo: 'Foto',
 };
 
+function groupClaimsByObservation(claims: ClaimRow[]): ClaimRow[][] {
+  const order: string[] = [];
+  const byObservation = new Map<string, ClaimRow[]>();
+  for (const claim of claims) {
+    if (!byObservation.has(claim.observationId)) {
+      order.push(claim.observationId);
+      byObservation.set(claim.observationId, []);
+    }
+    byObservation.get(claim.observationId)!.push(claim);
+  }
+  return order.map((id) => byObservation.get(id)!);
+}
+
+function sharedEvidence(group: ClaimRow[]): string | null {
+  const quotes = group.map((c) => c.evidence).filter((v): v is string => Boolean(v));
+  if (quotes.length === 0) return null;
+  const first = quotes[0];
+  return quotes.every((q) => q === first) ? first : null;
+}
+
 export default function EquipmentDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
+  const toast = useToast();
+  const { styles, muted, primary } = useAppStyles();
   const observer = useObserverName();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -76,6 +105,8 @@ export default function EquipmentDetailScreen() {
     setClaims(c.sort((a, b) => (a.observedAt < b.observedAt ? 1 : -1)));
     setLoading(false);
   }, [id]);
+
+  const observationGroups = useMemo(() => groupClaimsByObservation(claims), [claims]);
 
   useEffect(() => {
     load();
@@ -130,7 +161,7 @@ export default function EquipmentDetailScreen() {
       });
       setScanResult(null);
       await load();
-      Alert.alert('Aplicado', 'Los datos de la placa se guardaron como confirmados.');
+      toast.success('Aplicado', 'Los datos de la placa se guardaron como confirmados.');
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? String(e));
     } finally {
@@ -156,7 +187,7 @@ export default function EquipmentDetailScreen() {
         observerId: observer.name,
       });
       await load();
-      Alert.alert('Guardado', 'Los cambios se guardaron como una corrección confirmada.');
+      toast.success('Guardado', 'Los cambios se guardaron como una corrección confirmada.');
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? String(e));
     } finally {
@@ -166,197 +197,133 @@ export default function EquipmentDetailScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 bg-white items-center justify-center">
-        <ActivityIndicator color="#0066CC" size="large" />
-      </SafeAreaView>
+      <Screen centered>
+        <Spinner size="lg" />
+      </Screen>
     );
   }
 
   if (!equipment) {
     return (
-      <SafeAreaView className="flex-1 bg-white items-center justify-center">
-        <Text className="text-gray-600">Equipo no encontrado.</Text>
-      </SafeAreaView>
+      <Screen centered>
+        <Text variant="caption">Equipo no encontrado.</Text>
+      </Screen>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <ScrollView contentContainerClassName="p-4 pb-12">
-        <Text className="text-gray-600 text-xs font-semibold uppercase mb-1">{institutionName}</Text>
-        <Text className="text-gray-900 text-2xl font-bold mb-1">{equipment.modality}</Text>
-        <Text className="text-gray-500 text-xs mb-6">
+    <Screen>
+      <ScrollView contentContainerStyle={[styles.pad, styles.padBottom]}>
+        <Text variant="caption">{institutionName}</Text>
+        <Text variant="title" style={{ marginBottom: 4 }}>{equipment.modality}</Text>
+        <Text variant="caption" style={{ marginBottom: 20 }}>
           Última verificación: {fmtDate(equipment.lastVerifiedAt)}
         </Text>
 
-        <Pressable
-          onPress={handleScanPlate}
-          disabled={scanning}
-          className="mb-4 flex-row items-center justify-center gap-2 rounded-xl border-2 border-blue-200 bg-blue-50 py-3.5 active:bg-blue-100">
-          {scanning ? (
-            <>
-              <ActivityIndicator color="#0066CC" size="small" />
-              <Text className="text-blue-700 font-semibold text-sm">
-                {scanProgress != null ? `Analizando placa… ${scanProgress}%` : 'Reconociendo texto…'}
-              </Text>
-            </>
-          ) : (
-            <>
-              <Icon name="camera" size="sm" color="#0066CC" />
-              <Text className="text-blue-700 font-semibold text-sm">Escanear placa</Text>
-            </>
-          )}
-        </Pressable>
+        <Button variant="outline" onPress={handleScanPlate} disabled={scanning} loading={scanning} style={{ marginBottom: 16 }}>
+          {scanning
+            ? (scanProgress != null ? `Analizando placa… ${scanProgress}%` : 'Reconociendo texto…')
+            : 'Escanear placa'}
+        </Button>
 
         {scanResult && (
-          <View className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
-            <Text className="text-blue-700 text-xs font-bold uppercase mb-3">Datos Reconocidos</Text>
-            {scanResult.manufacturer && <Text className="text-gray-900 text-sm mb-2"><Text className="font-semibold">Fabricante:</Text> {scanResult.manufacturer}</Text>}
-            {scanResult.model && <Text className="text-gray-900 text-sm mb-2"><Text className="font-semibold">Modelo:</Text> {scanResult.model}</Text>}
-            {scanResult.serial && <Text className="text-gray-900 text-sm mb-2"><Text className="font-semibold">Serial:</Text> {scanResult.serial}</Text>}
-            {scanResult.installYear && <Text className="text-gray-900 text-sm mb-3"><Text className="font-semibold">Año:</Text> {scanResult.installYear}</Text>}
-            <View className="flex-row gap-2">
-              <Pressable
-                onPress={handleApplyScan}
-                disabled={saving}
-                className="flex-1 flex-row items-center justify-center gap-2 rounded-xl bg-green-600 py-3 active:bg-green-700">
-                {saving ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <>
-                    <Icon name="check" size="sm" color="#FFFFFF" />
-                    <Text className="text-white font-semibold text-sm">Confirmar</Text>
-                  </>
-                )}
-              </Pressable>
-              <Pressable
-                onPress={() => setScanResult(null)}
-                disabled={saving}
-                className="flex-1 items-center justify-center rounded-xl border border-gray-300 bg-gray-50 py-3 active:bg-gray-100">
-                <Text className="text-blue-600 font-semibold text-sm">Descartar</Text>
-              </Pressable>
+          <Card style={{ marginBottom: 20 }}>
+            <Text variant="caption" style={{ marginBottom: 12 }}>Datos reconocidos</Text>
+            {scanResult.manufacturer && <Text variant="body" style={{ marginBottom: 6 }}>Fabricante: {scanResult.manufacturer}</Text>}
+            {scanResult.model && <Text variant="body" style={{ marginBottom: 6 }}>Modelo: {scanResult.model}</Text>}
+            {scanResult.serial && <Text variant="body" style={{ marginBottom: 6 }}>Serial: {scanResult.serial}</Text>}
+            {scanResult.installYear && <Text variant="body" style={{ marginBottom: 12 }}>Año: {scanResult.installYear}</Text>}
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <View style={{ flex: 1 }}>
+                <Button onPress={handleApplyScan} disabled={saving} loading={saving}>Confirmar</Button>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Button variant="outline" onPress={() => setScanResult(null)} disabled={saving}>Descartar</Button>
+              </View>
             </View>
-          </View>
+          </Card>
         )}
 
-        <View className="bg-white border border-gray-200 rounded-xl p-4 mb-6">
-          <View className="mb-4">
-            <Text className="text-gray-700 text-sm font-semibold mb-2">Fabricante</Text>
-            <View className="flex-row items-center gap-2">
-              <TextInput
-                value={manufacturer}
-                onChangeText={setManufacturer}
-                placeholder="Ej: Siemens"
-                placeholderTextColor="#9CA3AF"
-                className="bg-gray-50 text-gray-900 rounded-lg px-3 py-2 flex-1 border border-gray-200"
-              />
-              <StatusChip status={statusManufacturer} onPress={() => setStatusManufacturer(cycleStatus(statusManufacturer))} />
+        <Card style={{ marginBottom: 20 }}>
+          <Text variant="caption" style={{ marginBottom: 8 }}>Fabricante</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <TextInput value={manufacturer} onChangeText={setManufacturer} placeholder="Ej: Siemens" placeholderTextColor={muted} style={[styles.input, { flex: 1 }]} />
+            <StatusChip status={statusManufacturer} onPress={() => setStatusManufacturer(cycleStatus(statusManufacturer))} />
+          </View>
+          <Text variant="caption" style={{ marginBottom: 8 }}>Modelo</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <TextInput value={model} onChangeText={setModel} placeholder="Ej: Magnetom" placeholderTextColor={muted} style={[styles.input, { flex: 1 }]} />
+            <StatusChip status={statusModel} onPress={() => setStatusModel(cycleStatus(statusModel))} />
+          </View>
+          <Text variant="caption" style={{ marginBottom: 8 }}>Número de serie</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <TextInput value={serial} onChangeText={setSerial} placeholder="Ej: SN123456" placeholderTextColor={muted} style={[styles.input, { flex: 1 }]} />
+            <Pressable onPress={handleScanPlate} disabled={scanning} accessibilityLabel="Escanear placa" style={[styles.ghostChip, { width: 44, height: 44, justifyContent: 'center' }]}>
+              {scanning ? <Spinner size="sm" /> : <Icon name="camera" size="sm" color={primary} />}
+            </Pressable>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 12, marginBottom: 14 }}>
+            <View style={{ flex: 1 }}>
+              <Text variant="caption" style={{ marginBottom: 8 }}>Cantidad</Text>
+              <TextInput value={count} onChangeText={setCount} keyboardType="number-pad" placeholder="—" placeholderTextColor={muted} style={styles.input} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text variant="caption" style={{ marginBottom: 8 }}>Año de instalación</Text>
+              <TextInput value={installYear} onChangeText={setInstallYear} keyboardType="number-pad" placeholder="—" placeholderTextColor={muted} style={styles.input} />
             </View>
           </View>
-
-          <View className="mb-4">
-            <Text className="text-gray-700 text-sm font-semibold mb-2">Modelo</Text>
-            <View className="flex-row items-center gap-2">
-              <TextInput
-                value={model}
-                onChangeText={setModel}
-                placeholder="Ej: Magnetom"
-                placeholderTextColor="#9CA3AF"
-                className="bg-gray-50 text-gray-900 rounded-lg px-3 py-2 flex-1 border border-gray-200"
-              />
-              <StatusChip status={statusModel} onPress={() => setStatusModel(cycleStatus(statusModel))} />
-            </View>
-          </View>
-
-          <View className="mb-4">
-            <Text className="text-gray-700 text-sm font-semibold mb-2">Número de Serie</Text>
-            <View className="flex-row items-center gap-2">
-              <TextInput
-                value={serial}
-                onChangeText={setSerial}
-                placeholder="Ej: SN123456"
-                placeholderTextColor="#9CA3AF"
-                className="bg-gray-50 text-gray-900 rounded-lg px-3 py-2 flex-1 border border-gray-200"
-              />
-              <Pressable
-                onPress={handleScanPlate}
-                disabled={scanning}
-                accessibilityLabel="Escanear placa"
-                className="w-11 h-11 rounded-lg border border-blue-200 bg-blue-50 items-center justify-center active:bg-blue-100">
-                {scanning ? (
-                  <ActivityIndicator color="#0066CC" size="small" />
-                ) : (
-                  <Icon name="camera" size="sm" color="#0066CC" />
-                )}
-              </Pressable>
-            </View>
-          </View>
-
-          <View className="flex-row gap-3 mb-4">
-            <View className="flex-1">
-              <Text className="text-gray-700 text-sm font-semibold mb-2">Cantidad</Text>
-              <TextInput
-                value={count}
-                onChangeText={setCount}
-                keyboardType="number-pad"
-                placeholder="—"
-                placeholderTextColor="#9CA3AF"
-                className="bg-gray-50 text-gray-900 rounded-lg px-3 py-2 border border-gray-200"
-              />
-            </View>
-            <View className="flex-1">
-              <Text className="text-gray-700 text-sm font-semibold mb-2">Año de Instalación</Text>
-              <TextInput
-                value={installYear}
-                onChangeText={setInstallYear}
-                keyboardType="number-pad"
-                placeholder="—"
-                placeholderTextColor="#9CA3AF"
-                className="bg-gray-50 text-gray-900 rounded-lg px-3 py-2 border border-gray-200"
-              />
-            </View>
-          </View>
-          <View className="flex-row justify-end">
+          <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
             <StatusChip status={statusAge} onPress={() => setStatusAge(cycleStatus(statusAge))} />
           </View>
-        </View>
+        </Card>
 
-        <Pressable
-          onPress={handleSave}
-          disabled={saving}
-          className="mb-6 flex-row items-center justify-center gap-2 rounded-xl bg-green-600 py-4 active:bg-green-700">
-          {saving ? (
-            <ActivityIndicator color="#FFFFFF" size="small" />
-          ) : (
-            <>
-              <Icon name="save" size="sm" color="#FFFFFF" />
-              <Text className="text-white font-semibold text-base">Guardar Cambios</Text>
-            </>
-          )}
-        </Pressable>
+        <Button onPress={handleSave} disabled={saving} loading={saving} style={{ marginBottom: 24 }}>
+          Guardar cambios
+        </Button>
 
-        <Text className="text-gray-700 text-sm font-bold uppercase mb-3">
-          Historial de Observaciones ({claims.length})
+        <Text variant="caption" style={{ marginBottom: 12 }}>
+          Historial de observaciones ({observationGroups.length})
         </Text>
-        {claims.length === 0 && (
-          <View className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-            <Text className="text-gray-600">Sin observaciones registradas.</Text>
-          </View>
-        )}
-        {claims.map((c) => (
-          <View key={c.id} className="bg-white border border-gray-200 rounded-lg p-3 mb-2">
-            <View className="flex-row items-center justify-between mb-2">
-              <Text className="text-gray-900 text-sm font-semibold">{FIELD_LABEL[c.field] ?? c.field}</Text>
-              <StatusChip status={c.status} />
-            </View>
-            {c.value && <Text className="text-gray-700 text-sm mb-2">{c.value}</Text>}
-            {c.evidence && <Text className="text-gray-600 text-xs italic mb-2">"{c.evidence}"</Text>}
-            <Text className="text-gray-500 text-xs">
-              {fmtDate(c.observedAt)} · {c.observerId} · {SOURCE_LABEL[c.source] ?? c.source}
-            </Text>
-          </View>
-        ))}
+        {observationGroups.length === 0 && <EmptyState>Sin observaciones registradas.</EmptyState>}
+        {observationGroups.map((group) => {
+          const head = group[0];
+          const quote = sharedEvidence(group);
+          return (
+            <Card key={head.observationId} style={{ marginBottom: 8 }}>
+              <Text variant="caption" style={{ marginBottom: 10 }}>
+                {fmtDate(head.observedAt)} · {head.observerId} · {SOURCE_LABEL[head.source] ?? head.source}
+              </Text>
+              {quote ? (
+                <Text variant="caption" style={{ fontStyle: 'italic', marginBottom: 12 }}>
+                  "{quote}"
+                </Text>
+              ) : null}
+              {group.map((c, index) => (
+                <View
+                  key={c.id}
+                  style={{
+                    marginBottom: index < group.length - 1 ? 10 : 0,
+                    paddingBottom: index < group.length - 1 ? 10 : 0,
+                    borderBottomWidth: index < group.length - 1 ? 1 : 0,
+                    borderBottomColor: styles.card.borderColor,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <Text variant="subtitle">{FIELD_LABEL[c.field] ?? c.field}</Text>
+                    <StatusChip status={c.status} />
+                  </View>
+                  {c.value ? <Text variant="body">{c.value}</Text> : null}
+                  {!quote && c.evidence ? (
+                    <Text variant="caption" style={{ fontStyle: 'italic', marginTop: 4 }}>
+                      "{c.evidence}"
+                    </Text>
+                  ) : null}
+                </View>
+              ))}
+            </Card>
+          );
+        })}
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 }

@@ -1,6 +1,10 @@
 import React from 'react';
-import { Modal as RNModal, View, Text, Pressable, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { Modal as RNModal, View, Pressable, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { Icon } from './Icon';
+import { Text } from '@/components/ui/text';
+import { useColor } from '@/hooks/useColor';
+import { FontFamily } from '@/theme/fonts';
+import { BORDER_RADIUS } from '@/theme/globals';
 
 interface ModalProps {
   visible: boolean;
@@ -19,6 +23,11 @@ export function Modal({
   actions,
   closeOnBackdrop = true,
 }: ModalProps) {
+  const card = useColor('card');
+  const border = useColor('border');
+  const muted = useColor('textMuted');
+  const text = useColor('text');
+
   return (
     <RNModal visible={visible} transparent animationType="fade">
       <KeyboardAvoidingView
@@ -27,11 +36,11 @@ export function Modal({
         <Pressable
           style={styles.backdrop}
           onPress={closeOnBackdrop ? onClose : undefined}>
-          <View style={styles.container} onStartShouldSetResponder={() => true}>
-            <View style={styles.header}>
-              <Text style={styles.title}>{title}</Text>
+          <View style={[styles.container, { backgroundColor: card }]} onStartShouldSetResponder={() => true}>
+            <View style={[styles.header, { borderBottomColor: border }]}>
+              <Text style={[styles.title, { color: text }]}>{title}</Text>
               <Pressable onPress={onClose} style={styles.closeButton}>
-                <Icon name="close" size="md" color="#6B7280" />
+                <Icon name="close" size="md" color={muted} />
               </Pressable>
             </View>
 
@@ -39,7 +48,7 @@ export function Modal({
               {children}
             </ScrollView>
 
-            {actions && <View style={styles.actions}>{actions}</View>}
+            {actions && <View style={[styles.actions, { borderTopColor: border }]}>{actions}</View>}
           </View>
         </Pressable>
       </KeyboardAvoidingView>
@@ -50,13 +59,12 @@ export function Modal({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(26, 23, 20, 0.45)',
     justifyContent: 'flex-end',
   },
   container: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: BORDER_RADIUS,
+    borderTopRightRadius: BORDER_RADIUS,
     maxHeight: '90%',
     paddingTop: 20,
   },
@@ -66,13 +74,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   title: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontFamily: FontFamily.serifBold,
   },
   closeButton: {
     padding: 8,
@@ -84,8 +90,7 @@ const styles = StyleSheet.create({
   actions: {
     paddingHorizontal: 20,
     paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopWidth: StyleSheet.hairlineWidth,
     gap: 12,
   },
 });

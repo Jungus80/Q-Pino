@@ -1,7 +1,6 @@
 import { normalizeObservation } from '@/core/normalize/pipeline';
 import { computeNextQuestion } from '@/core/followup/nextQuestion';
-import type { ExtractedObservation, Modality, NormalizedEquipment, NormalizedInstitution } from '@/core/schema/observation';
-import { MODALITIES } from '@/core/schema/observation';
+import type { ExtractedObservation, NormalizedEquipment, NormalizedInstitution } from '@/core/schema/observation';
 import { saveObservation } from '@/db/saveObservation';
 import { matchInstitution } from '@/db/repos/institutions';
 import { extractObservation } from '@/ai/extract';
@@ -10,26 +9,28 @@ import { scanPlate } from '@/ai/plateOcr';
 import { useLlmPreload } from '@/hooks/use-llm-preload';
 import { useObserverName } from '@/hooks/use-observer-name';
 import { StatusChip, cycleStatus } from '@/components/StatusChip';
-import { RecordingButton } from '@/components/RecordingButton';
 import { Icon } from '@/components/Icon';
+import { Screen } from '@/components/kit/Screen';
+import { ScreenHeader } from '@/components/kit/ScreenHeader';
+import { StickyActionBar } from '@/components/kit/StickyActionBar';
+import { VoiceCapture } from '@/components/kit/VoiceCapture';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
+import { Separator } from '@/components/ui/separator';
+import { Spinner } from '@/components/ui/spinner';
+import { Text } from '@/components/ui/text';
+import { View } from '@/components/ui/view';
+import { Badge } from '@/components/ui/badge';
+import { ModeToggle } from '@/components/ui/mode-toggle';
 import { Modal } from '@/components/Modal';
-import { ProfessionalButton } from '@/components/ProfessionalButton';
-import { StickyFooterTabBarInset, TabScreenSafeAreaEdges } from '@/constants/theme';
+import { StickyFooterTabBarInset } from '@/constants/theme';
+import { useAppStyles } from '@/theme/useAppStyles';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-
-/** Floating-card shadow for sticky footers — kept as a plain style object since
- * NativeWind's `shadow-*` classes don't reliably map to Android's `elevation`. */
-const floatingFooterShadow = {
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.12,
-  shadowRadius: 12,
-  elevation: 6,
-};
+import { useEffect, useMemo, useState } from 'react';
+import { Alert, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput } from 'react-native';
 
 /** Promisified 3-way Alert — used for the institution merge confirmation, where the
  * caller needs to actually await the user's choice before deciding how to save. */
@@ -43,44 +44,15 @@ function confirmAsync(title: string, message: string, confirmLabel: string, canc
   });
 }
 
-type Screen = 'input' | 'extracting' | 'review' | 'saving';
-
-const WAVEFORM_BARS = 20;
-
-/**
- * Live mic-level waveform, driven directly from raw audio (not the ASR's transcript
- * output) so it stays visibly responsive during the 1-3s gaps between Parakeet's partial
- * transcript updates — closes the "is this frozen?" perception gap that comes from
- * on-device streaming ASR's inherent chunking latency.
- */
-function Waveform({ level }: { level: number }) {
-  const historyRef = useRef<number[]>(new Array(WAVEFORM_BARS).fill(0));
-  const [, forceRender] = useState(0);
-
-  useEffect(() => {
-    historyRef.current = [...historyRef.current.slice(1), level];
-    forceRender((n) => n + 1);
-  }, [level]);
-
-  return (
-    <View className="flex-row items-center gap-1 h-12 bg-red-100 rounded-lg p-2">
-      {historyRef.current.map((v, i) => (
-        <View
-          key={i}
-          className="flex-1 bg-gradient-to-b from-red-500 to-red-400 rounded-full"
-          style={{ height: Math.max(4, v * 40), opacity: 0.3 + v * 0.7 }}
-        />
-      ))}
-    </View>
-  );
-}
+type CapturePhase = 'input' | 'extracting' | 'review' | 'saving';
 
 export default function CaptureScreen() {
   const router = useRouter();
+  const { styles, muted, green, red, orange } = useAppStyles();
   const voice = useVoiceCapture();
   const observer = useObserverName();
   const { llmPreloading, llmPreloadProgress } = useLlmPreload();
-  const [screen, setScreen] = useState<Screen>('input');
+  const [screen, setScreen] = useState<CapturePhase>('input');
   const [text, setText] = useState('');
   const [source, setSource] = useState<'text' | 'voice'>('text');
   const [progress, setProgress] = useState<number | null>(null);
@@ -261,160 +233,116 @@ export default function CaptureScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={TabScreenSafeAreaEdges}>
+    <Screen>
       <KeyboardAvoidingView
-        className="flex-1"
-        // Android: KeyboardAvoidingView's native resize ('height'/'padding') has no
-        // effect here — this screen is hosted inside a NativeTabs/react-native-screens
-        // Fragment whose layout doesn't shrink from RN's animated height style (and
-        // windowSoftInputMode="adjustResize" no longer resizes the window under
-        // edge-to-edge either). So on Android we skip the built-in behavior and instead
-        // apply the measured keyboard height as padding ourselves, below.
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        // NativeTabs bar sits below this screen — offset so the footer clears it.
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-        style={{ paddingBottom: androidKeyboardHeight }}>
+        style={{ flex: 1, paddingBottom: androidKeyboardHeight }}>
         <ScrollView
-          contentContainerClassName="p-4 pb-12"
+          contentContainerStyle={[styles.pad, { paddingBottom: 48 }]}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag">
-        <View className="flex-row items-center justify-between mb-2 gap-2">
-          <View className="flex-1 shrink">
-            <Text className="text-gray-900 text-2xl font-bold">Nueva Observación</Text>
-            <Text className="text-gray-500 text-sm mt-1">Registra los detalles de la visita</Text>
-          </View>
-          <Pressable onPress={observer.promptForName} className="flex-row items-center gap-2 bg-gray-100 rounded-lg px-3 py-2 shrink-0 max-w-[45%]">
-            <Icon name="user" size="sm" color="#374151" />
-            <Text className="text-gray-700 text-sm font-medium" numberOfLines={1}>{observer.name}</Text>
-          </Pressable>
-        </View>
-        <View className="flex-row gap-2 mb-4">
-          <View className="flex-1 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 flex-row items-center gap-2">
-            <Icon name="phone" size="sm" color="#0066CC" />
-            <Text className="text-blue-700 text-xs font-medium">Modo sin conexión</Text>
-          </View>
-          {llmPreloading && (
-            <View className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 flex-row items-center gap-2">
-              <ActivityIndicator color="#0066CC" size="small" />
-              <Text className="text-gray-600 text-xs font-medium">
-                Preparando IA{llmPreloadProgress != null ? ` ${Math.round(llmPreloadProgress)}%` : ''}
-              </Text>
+        <ScreenHeader
+          title="Nueva observación"
+          subtitle="Registra los detalles de la visita"
+          right={
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <ModeToggle />
+              <Pressable onPress={observer.promptForName} style={styles.ghostChip}>
+                <Icon name="user" size="sm" color={muted} />
+                <Text style={styles.ghostChipText} numberOfLines={1}>
+                  {observer.name}
+                </Text>
+              </Pressable>
             </View>
+          }
+        />
+        <View style={[styles.wrap, { marginBottom: 16 }]}>
+          <Badge variant="secondary">Modo sin conexión</Badge>
+          {llmPreloading && (
+            <Badge variant="outline">
+              {`Preparando IA${llmPreloadProgress != null ? ` ${Math.round(llmPreloadProgress)}%` : ''}`}
+            </Badge>
           )}
         </View>
 
         {screen === 'input' && (
           <>
-            {voice.isRecording ? (
-              <View className="bg-red-50 border-2 border-red-300 rounded-xl p-4 min-h-32 justify-center">
-                <View className="flex-row items-center mb-3">
-                  <View className="w-3 h-3 rounded-full bg-red-500 mr-2 animate-pulse" />
-                  <Text className="text-red-600 text-sm font-semibold">Grabando audio</Text>
-                </View>
-                <Waveform level={voice.audioLevel} />
-              </View>
-            ) : voice.isLoadingModel || voice.isTranscribing ? (
-              <View className="bg-blue-50 border border-blue-200 rounded-xl p-4 min-h-32 items-center justify-center">
-                <ActivityIndicator color="#0066CC" size="large" />
-                <Text className="text-blue-700 mt-3 text-sm font-medium">
-                  {voice.isLoadingModel ? 'Preparando reconocimiento de voz' : 'Convirtiendo audio a texto'}
-                </Text>
-              </View>
+            {voice.isRecording || voice.isLoadingModel || voice.isTranscribing || voice.isStarting ? (
+              <VoiceCapture
+                isRecording={voice.isRecording}
+                isStarting={voice.isStarting}
+                isLoadingModel={voice.isLoadingModel}
+                isTranscribing={voice.isTranscribing}
+                audioLevel={voice.audioLevel}
+                onToggle={handleToggleVoice}
+              />
             ) : (
-              <View className="bg-white border-2 border-gray-200 rounded-xl p-4">
-                <Text className="text-gray-700 text-sm font-semibold mb-2">Descripción de la visita</Text>
-                <TextInput
+              <Card>
+                <Input
+                  label="Descripción de la visita"
+                  type="textarea"
+                  rows={5}
                   value={text}
                   onChangeText={(v) => {
                     setText(v);
                     setSource('text');
                   }}
-                  multiline
                   placeholder='Ej: "Estoy en Hospital DemoCare Pacific, en Panamá. Vi dos resonadores, uno parece de unos ocho años."'
-                  placeholderTextColor="#9CA3AF"
-                  className="bg-gray-50 text-gray-900 rounded-xl p-4 min-h-32 text-base border border-gray-200 focus:border-blue-500"
-                  style={{ textAlignVertical: 'top' }}
                 />
-                <Text className="text-gray-500 text-xs mt-2">Proporciona detalles técnicos y observaciones relevantes</Text>
-
-                <View className="flex-row items-center my-5">
-                  <View className="flex-1 h-px bg-gray-200" />
-                  <Text className="mx-3 text-gray-400 text-xs font-medium uppercase tracking-wide">o graba con voz</Text>
-                  <View className="flex-1 h-px bg-gray-200" />
+                <Text variant="caption" style={{ marginTop: 8 }}>Proporciona detalles técnicos y observaciones relevantes</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 16, gap: 12 }}>
+                  <View style={{ flex: 1 }}><Separator /></View>
+                  <Text variant="caption">o graba con voz</Text>
+                  <View style={{ flex: 1 }}><Separator /></View>
                 </View>
-
-                {!voice.isRecording && (
-                  <Pressable
-                    onPress={handleToggleVoice}
-                    disabled={voice.isStarting || voice.isLoadingModel || voice.isTranscribing}
-                    className="flex-row items-center justify-center gap-3 py-3 px-4 rounded-xl border-2 border-blue-200 bg-blue-50 active:bg-blue-100">
-                    <View className="w-10 h-10 rounded-full bg-blue-600 items-center justify-center">
-                      {voice.isStarting ? (
-                        <ActivityIndicator color="#FFFFFF" size="small" />
-                      ) : (
-                        <Icon name="mic" size="sm" color="#FFFFFF" />
-                      )}
-                    </View>
-                    <Text className="text-blue-700 font-semibold text-sm">
-                      {voice.isStarting ? 'Iniciando grabación…' : 'Presiona para grabar'}
-                    </Text>
-                  </Pressable>
-                )}
-              </View>
+                <VoiceCapture
+                  embedded
+                  isRecording={false}
+                  isStarting={voice.isStarting}
+                  isLoadingModel={voice.isLoadingModel}
+                  isTranscribing={voice.isTranscribing}
+                  audioLevel={0}
+                  onToggle={handleToggleVoice}
+                />
+              </Card>
             )}
 
-            {screen === 'input' && !voice.isRecording && !voice.isLoadingModel && !voice.isTranscribing && (
-              <View className="mt-4 bg-gray-50 border border-gray-200 rounded-xl p-4">
-                <Text className="text-gray-700 text-xs font-bold uppercase mb-2">Para una mejor lectura</Text>
+            {!voice.isRecording && !voice.isLoadingModel && !voice.isTranscribing && (
+              <View style={{ marginTop: 16 }}>
+                <Text variant="caption" style={{ marginBottom: 8 }}>Para una mejor lectura</Text>
                 {[
                   'Nombrá el cliente, la ciudad y el país.',
                   'Indicá cuántos equipos hay, su modalidad y antigüedad aproximada.',
                   'Mencioná el fabricante o modelo si lo ves en la placa.',
                 ].map((tip) => (
-                  <View key={tip} className="flex-row items-start gap-2 mb-1.5 last:mb-0">
-                    <Icon name="check" size="xs" color="#10B981" />
-                    <Text className="text-gray-600 text-xs flex-1">{tip}</Text>
+                  <View key={tip} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 6 }}>
+                    <Icon name="check" size="xs" color={green} />
+                    <Text variant="caption" style={{ flex: 1 }}>{tip}</Text>
                   </View>
                 ))}
               </View>
             )}
 
-            {voice.isRecording && (
-              <RecordingButton
-                isRecording={voice.isRecording}
-                isLoading={voice.isLoadingModel}
-                isTranscribing={voice.isTranscribing}
-                onPress={handleToggleVoice}
-              />
-            )}
-
             {(error || voice.error) && (
-              <View className="bg-red-50 border border-red-200 rounded-lg p-3 mt-4 flex-row items-start gap-2">
-                <Icon name="error" size="sm" color="#DC2626" />
-                <Text className="text-red-700 text-sm font-medium flex-1">{error ?? voice.error}</Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
+                <Icon name="error" size="sm" color={red} />
+                <Text style={[styles.bodySm, { color: red, flex: 1 }]}>{error ?? voice.error}</Text>
               </View>
             )}
 
-            {/* Spacer so scroll content clears the floating sticky CTA below. */}
             <View style={{ height: 100 }} />
           </>
         )}
 
         {screen === 'extracting' && (
-          <View className="items-center py-16">
-            <ActivityIndicator color="#0066CC" size="large" />
-            <Text className="text-gray-900 mt-4 text-base font-semibold">
-              Analizando información
-            </Text>
-            <Text className="text-gray-600 mt-2 text-sm">
-              Extrayendo datos relevantes
-            </Text>
+          <View style={{ alignItems: 'center', paddingVertical: 48 }}>
+            <Spinner size="lg" />
+            <Text variant="subtitle" style={{ marginTop: 16 }}>Analizando información</Text>
+            <Text variant="caption" style={{ marginTop: 8 }}>Extrayendo datos relevantes</Text>
             {progress != null && (
-              <View className="mt-4 w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                <View
-                  className="bg-blue-600 h-full rounded-full"
-                  style={{ width: `${progress}%` }}
-                />
+              <View style={{ width: '100%', marginTop: 16 }}>
+                <Progress value={progress} />
               </View>
             )}
           </View>
@@ -422,204 +350,169 @@ export default function CaptureScreen() {
 
         {(screen === 'review' || screen === 'saving') && institution && (
           <View>
-            <View className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
-              <Text className="text-blue-700 text-xs font-bold uppercase mb-3">Cliente Identificado</Text>
+            <Card style={{ marginBottom: 20 }}>
+              <Text variant="caption" style={{ marginBottom: 12 }}>Cliente identificado</Text>
               <TextInput
                 value={institution.name ?? ''}
                 onChangeText={(v) => setInstitution({ ...institution, name: v || null })}
                 placeholder="Nombre del cliente"
-                placeholderTextColor="#9CA3AF"
-                className="bg-white text-gray-900 rounded-lg px-3 py-2 mb-3 border border-gray-200 text-base font-semibold"
+                placeholderTextColor={muted}
+                style={[styles.input, styles.bodySemi, { marginBottom: 10 }]}
               />
-              <View className="flex-row gap-2">
+              <View style={{ flexDirection: 'row', gap: 8 }}>
                 <TextInput
                   value={institution.city ?? ''}
                   onChangeText={(v) => setInstitution({ ...institution, city: v || null })}
                   placeholder="Ciudad"
-                  placeholderTextColor="#9CA3AF"
-                  className="bg-white text-gray-900 rounded-lg px-3 py-2 flex-1 border border-gray-200"
+                  placeholderTextColor={muted}
+                  style={[styles.input, { flex: 1 }]}
                 />
                 <TextInput
                   value={institution.countryIso ?? ''}
                   onChangeText={(v) => setInstitution({ ...institution, countryIso: v.toUpperCase() || null })}
                   placeholder="País"
-                  placeholderTextColor="#9CA3AF"
-                  className="bg-white text-gray-900 rounded-lg px-3 py-2 w-20 border border-gray-200"
+                  placeholderTextColor={muted}
+                  autoCapitalize="characters"
+                  style={[styles.input, { width: 80 }]}
                 />
               </View>
-            </View>
+            </Card>
 
             {followUp && (
-              <View className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 flex-row items-start gap-3">
-                <Icon name="info" size="md" color="#D97706" />
-                <View className="flex-1">
-                  <Text className="text-amber-700 text-xs font-bold uppercase mb-1">Información Importante</Text>
-                  <Text className="text-gray-900 text-sm font-medium">{followUp.question}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 20 }}>
+                <Icon name="info" size="md" color={orange} />
+                <View style={{ flex: 1 }}>
+                  <Text variant="caption">Información importante</Text>
+                  <Text variant="subtitle">{followUp.question}</Text>
                 </View>
               </View>
             )}
 
-            <Text className="text-gray-700 text-sm font-bold uppercase mb-3">
-              Equipos Detectados ({equipment.length})
+            <Text variant="caption" style={{ marginBottom: 12 }}>
+              Equipos detectados ({equipment.length})
             </Text>
             {equipment.length === 0 && (
-              <View className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-4">
-                <Text className="text-gray-600 text-sm">No se detectó ningún equipo en el texto.</Text>
-              </View>
+              <Text variant="caption" style={{ marginBottom: 16 }}>No se detectó ningún equipo en el texto.</Text>
             )}
             {equipment.map((eq, i) => (
-              <View key={i} className="bg-white border border-gray-200 rounded-xl p-4 mb-3">
-                <View className="flex-row items-center justify-between mb-4">
-                  <Text className="text-gray-900 font-bold text-base">{eq.modality}</Text>
+              <Card key={i} style={{ marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                  <Text variant="subtitle">{eq.modality}</Text>
                   <StatusChip status={eq.fieldStatus.count} onPress={() => updateEquipment(i, { fieldStatus: { ...eq.fieldStatus, count: cycleStatus(eq.fieldStatus.count) } })} />
                 </View>
 
-                <Pressable
+                <Button
+                  variant="outline"
                   onPress={() => handleScanForEquipment(i)}
                   disabled={scanningIndex !== null}
-                  className="bg-blue-50 border border-blue-200 rounded-lg py-2.5 items-center mb-4 flex-row justify-center gap-2">
-                  {scanningIndex === i ? (
-                    <>
-                      <ActivityIndicator color="#0066CC" />
-                      <Text className="text-blue-700 text-sm font-medium">
-                        {scanProgress !== null ? `Preparando análisis… ${scanProgress}%` : 'Reconociendo texto…'}
-                      </Text>
-                    </>
-                  ) : (
-                    <View className="flex-row items-center gap-2">
-                      <Icon name="camera" size="sm" color="#0066CC" />
-                      <Text className="text-blue-700 text-sm font-medium">Escanear placa para confirmar</Text>
-                    </View>
-                  )}
-                </Pressable>
+                  loading={scanningIndex === i}
+                  style={{ marginBottom: 14 }}
+                >
+                  {scanningIndex === i
+                    ? (scanProgress !== null ? `Preparando análisis… ${scanProgress}%` : 'Reconociendo texto…')
+                    : 'Escanear placa para confirmar'}
+                </Button>
 
-                <View className="mb-3">
-                  <Text className="text-gray-600 text-xs font-semibold mb-2">Cantidad</Text>
-                  <View className="flex-row items-center gap-2">
-                    <TextInput
-                      value={eq.count != null ? String(eq.count) : ''}
-                      onChangeText={(v) => updateEquipment(i, { count: v ? parseInt(v, 10) || null : null })}
-                      placeholder="0"
-                      placeholderTextColor="#9CA3AF"
-                      keyboardType="number-pad"
-                      className="bg-gray-50 text-gray-900 rounded-lg px-3 py-2 w-20 border border-gray-200"
-                    />
-                    <Text className="text-gray-600 text-xs">unidades</Text>
-                  </View>
+                <Text variant="caption" style={{ marginBottom: 6 }}>Cantidad</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                  <TextInput
+                    value={eq.count != null ? String(eq.count) : ''}
+                    onChangeText={(v) => updateEquipment(i, { count: v ? parseInt(v, 10) || null : null })}
+                    placeholder="0"
+                    placeholderTextColor={muted}
+                    keyboardType="number-pad"
+                    style={[styles.input, { width: 80 }]}
+                  />
+                  <Text variant="caption">unidades</Text>
                 </View>
 
-                <View className="mb-3">
-                  <Text className="text-gray-600 text-xs font-semibold mb-2">Fabricante</Text>
-                  <View className="flex-row items-center gap-2">
-                    <TextInput
-                      value={eq.manufacturer ?? ''}
-                      onChangeText={(v) => updateEquipment(i, { manufacturer: v || null })}
-                      placeholder="Ej: Siemens"
-                      placeholderTextColor="#9CA3AF"
-                      className="bg-gray-50 text-gray-900 rounded-lg px-3 py-2 flex-1 border border-gray-200"
-                    />
-                    <StatusChip status={eq.fieldStatus.manufacturer} onPress={() => updateEquipment(i, { fieldStatus: { ...eq.fieldStatus, manufacturer: cycleStatus(eq.fieldStatus.manufacturer) } })} />
-                  </View>
+                <Text variant="caption" style={{ marginBottom: 6 }}>Fabricante</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                  <TextInput
+                    value={eq.manufacturer ?? ''}
+                    onChangeText={(v) => updateEquipment(i, { manufacturer: v || null })}
+                    placeholder="Ej: Siemens"
+                    placeholderTextColor={muted}
+                    style={[styles.input, { flex: 1 }]}
+                  />
+                  <StatusChip status={eq.fieldStatus.manufacturer} onPress={() => updateEquipment(i, { fieldStatus: { ...eq.fieldStatus, manufacturer: cycleStatus(eq.fieldStatus.manufacturer) } })} />
                 </View>
 
-                <View className="mb-3">
-                  <Text className="text-gray-600 text-xs font-semibold mb-2">Modelo</Text>
-                  <View className="flex-row items-center gap-2">
-                    <TextInput
-                      value={eq.model ?? ''}
-                      onChangeText={(v) => updateEquipment(i, { model: v || null })}
-                      placeholder="Ej: Magnetom"
-                      placeholderTextColor="#9CA3AF"
-                      className="bg-gray-50 text-gray-900 rounded-lg px-3 py-2 flex-1 border border-gray-200"
-                    />
-                    <StatusChip status={eq.fieldStatus.model} onPress={() => updateEquipment(i, { fieldStatus: { ...eq.fieldStatus, model: cycleStatus(eq.fieldStatus.model) } })} />
-                  </View>
+                <Text variant="caption" style={{ marginBottom: 6 }}>Modelo</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                  <TextInput
+                    value={eq.model ?? ''}
+                    onChangeText={(v) => updateEquipment(i, { model: v || null })}
+                    placeholder="Ej: Magnetom"
+                    placeholderTextColor={muted}
+                    style={[styles.input, { flex: 1 }]}
+                  />
+                  <StatusChip status={eq.fieldStatus.model} onPress={() => updateEquipment(i, { fieldStatus: { ...eq.fieldStatus, model: cycleStatus(eq.fieldStatus.model) } })} />
                 </View>
 
-                <View>
-                  <Text className="text-gray-600 text-xs font-semibold mb-2">Año de Instalación</Text>
-                  <View className="flex-row items-center gap-2">
-                    <TextInput
-                      value={eq.installYearLo != null ? String(eq.installYearLo) : ''}
-                      onChangeText={(v) => {
-                        const year = v ? parseInt(v, 10) || null : null;
-                        updateEquipment(i, { installYearLo: year, installYearHi: year });
-                      }}
-                      placeholder="Ej: 2015"
-                      placeholderTextColor="#9CA3AF"
-                      keyboardType="number-pad"
-                      className="bg-gray-50 text-gray-900 rounded-lg px-3 py-2 flex-1 border border-gray-200"
-                    />
-                    <StatusChip status={eq.fieldStatus.age} onPress={() => updateEquipment(i, { fieldStatus: { ...eq.fieldStatus, age: cycleStatus(eq.fieldStatus.age) } })} />
-                  </View>
-                  {eq.installYearLo != null && eq.installYearHi != null && eq.installYearLo !== eq.installYearHi && (
-                    <Text className="text-gray-500 text-xs mt-2">Rango estimado: {eq.installYearLo}–{eq.installYearHi}</Text>
-                  )}
+                <Text variant="caption" style={{ marginBottom: 6 }}>Año de instalación</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <TextInput
+                    value={eq.installYearLo != null ? String(eq.installYearLo) : ''}
+                    onChangeText={(v) => {
+                      const year = v ? parseInt(v, 10) || null : null;
+                      updateEquipment(i, { installYearLo: year, installYearHi: year });
+                    }}
+                    placeholder="Ej: 2015"
+                    placeholderTextColor={muted}
+                    keyboardType="number-pad"
+                    style={[styles.input, { flex: 1 }]}
+                  />
+                  <StatusChip status={eq.fieldStatus.age} onPress={() => updateEquipment(i, { fieldStatus: { ...eq.fieldStatus, age: cycleStatus(eq.fieldStatus.age) } })} />
                 </View>
-              </View>
+                {eq.installYearLo != null && eq.installYearHi != null && eq.installYearLo !== eq.installYearHi && (
+                  <Text variant="caption" style={{ marginTop: 8 }}>Rango estimado: {eq.installYearLo}–{eq.installYearHi}</Text>
+                )}
+              </Card>
             ))}
 
             {error && (
-              <View className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 flex-row items-start gap-2">
-                <Icon name="error" size="sm" color="#DC2626" />
-                <Text className="text-red-700 text-sm font-medium flex-1">{error}</Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                <Icon name="error" size="sm" color={red} />
+                <Text style={[styles.bodySm, { color: red, flex: 1 }]}>{error}</Text>
               </View>
             )}
-
-            {/* Spacer so scroll content clears the sticky review footer. */}
             <View style={{ height: 100 }} />
           </View>
         )}
         </ScrollView>
 
-        {/* Floating sticky footer for review — save must stay visible above the tab bar. */}
         {(screen === 'review' || screen === 'saving') && institution && (
           <View style={{ paddingBottom: keyboardVisible ? 8 : StickyFooterTabBarInset + 16 }}>
-            <View
-              className="mx-4 p-3 bg-white rounded-2xl flex-row gap-3"
-              style={floatingFooterShadow}>
-              <Pressable
-                onPress={() => setScreen('input')}
-                disabled={screen === 'saving'}
-                className="flex-1 rounded-xl py-4 items-center justify-center border border-gray-300 bg-gray-50 active:bg-gray-100">
-                <Text className="text-blue-600 font-semibold text-sm">Volver a Editar</Text>
-              </Pressable>
-              <Pressable
-                onPress={handleSave}
-                disabled={screen === 'saving'}
-                className="flex-1 rounded-xl py-4 flex-row items-center justify-center gap-2 bg-green-600 active:bg-green-700">
-                {screen === 'saving' ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <>
-                    <Icon name="save" size="sm" color="#FFFFFF" />
-                    <Text className="text-white font-semibold text-sm">Guardar</Text>
-                  </>
-                )}
-              </Pressable>
-            </View>
+            <StickyActionBar>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <Button variant="outline" onPress={() => setScreen('input')} disabled={screen === 'saving'}>
+                    Volver a editar
+                  </Button>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Button onPress={handleSave} disabled={screen === 'saving'} loading={screen === 'saving'}>
+                    Guardar
+                  </Button>
+                </View>
+              </View>
+            </StickyActionBar>
           </View>
         )}
 
-        {/* Single floating sticky CTA — stays above the tab bar or the keyboard, never duplicated in scroll. */}
         {screen === 'input' && (
           <View style={{ paddingBottom: keyboardVisible ? 8 : StickyFooterTabBarInset + 16 }}>
-            <View className="mx-4 p-3 bg-white rounded-2xl" style={floatingFooterShadow}>
+            <StickyActionBar>
               {!canProceed && (
-                <Text className="text-gray-400 text-xs text-center mb-2">Escribe tu observación para continuar</Text>
-              )}
-              <Pressable
-                onPress={handleExtract}
-                disabled={!canProceed}
-                className={`rounded-xl py-4 flex-row items-center justify-center gap-2 ${
-                  canProceed ? 'bg-blue-600 active:bg-blue-700' : 'bg-gray-200 border border-gray-300'
-                }`}>
-                <Text className={`font-semibold text-base ${canProceed ? 'text-white' : 'text-gray-500'}`}>
-                  Continuar
+                <Text variant="caption" style={{ textAlign: 'center', marginBottom: 8 }}>
+                  Escribe tu observación para continuar
                 </Text>
-                <Icon name="chevron-right" size="sm" color={canProceed ? '#FFFFFF' : '#9CA3AF'} />
-              </Pressable>
-            </View>
+              )}
+              <Button onPress={handleExtract} disabled={!canProceed}>
+                Continuar
+              </Button>
+            </StickyActionBar>
           </View>
         )}
       </KeyboardAvoidingView>
@@ -629,22 +522,20 @@ export default function CaptureScreen() {
         title="Tu nombre"
         onClose={observer.androidPrompt.cancel}
         actions={
-          <ProfessionalButton
-            label="Guardar"
-            onPress={observer.androidPrompt.confirm}
-            disabled={!observer.androidPrompt.draft.trim()}
-            fullWidth
-          />
+          <Button onPress={observer.androidPrompt.confirm} disabled={!observer.androidPrompt.draft.trim()}>
+            Guardar
+          </Button>
         }>
-        <Text className="text-gray-500 text-sm mb-3">Aparecerá como el autor de tus observaciones.</Text>
+        <Text variant="caption" style={{ marginBottom: 12 }}>Aparecerá como el autor de tus observaciones.</Text>
         <TextInput
           value={observer.androidPrompt.draft}
           onChangeText={observer.androidPrompt.setDraft}
           placeholder="Ej: Juan Pérez"
+          placeholderTextColor={muted}
           autoFocus
-          className="border border-gray-300 rounded-lg px-3 py-2 text-gray-900"
+          style={styles.input}
         />
       </Modal>
-    </SafeAreaView>
+    </Screen>
   );
 }

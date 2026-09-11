@@ -136,7 +136,7 @@ export function buildDeterministicAnswer(answer: QueryAnswer, dsl: QueryDsl): st
 export function formatAnswerForSummary(answer: QueryAnswer, dsl: QueryDsl, notes: string[] = []): string {
   const lines: string[] = [];
   const filters = describeFilters(dsl).map((c) => c.label);
-  lines.push(`Filtros aplicados: ${filters.length ? filters.join(' · ') : 'ninguno (todo el parque)'}`);
+  lines.push(`Filtros aplicados: ${filters.length ? filters.join(' · ') : 'ninguno (todos los equipos)'}`);
   lines.push(`Métrica pedida: ${METRIC_LABEL[dsl.metric]}`);
   lines.push(`Total: ${plural(answer.equipmentTotal, 'equipo', 'equipos')} en ${plural(answer.clientTotal, 'cliente', 'clientes')}`);
   if (dsl.metric === 'avgAge' || dsl.metric === 'confidence') {

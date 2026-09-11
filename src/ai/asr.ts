@@ -56,7 +56,7 @@ export function useVoiceCapture() {
       const permission = await AudioStudioModule.requestPermissionsAsync();
       if (!permission.granted) {
         throw new Error(
-          'Sin permiso de micrófono. Actívalo en Ajustes > QVAC > Micrófono y vuelve a intentar.'
+          'Sin permiso de micrófono. Actívalo en Ajustes > Q-Pino > Micrófono y vuelve a intentar.'
         );
       }
 

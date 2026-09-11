@@ -13,9 +13,29 @@ export type AgeInterval = {
 const CONFIRMED_PATTERN =
   /\b(confirme|confirmado|confirmei|verifique|verificado|verifiquei|vi la placa|lei a placa|segun la placa|leida la placa|read the (plate|label)|checked the (plate|label)|confirmed|verified)\b/;
 
+// Calendar years spoken as "año 2005" / "del año 2005" / "instalado en 2019".
+// Evidence is accent-stripped ("año" → "ano"). Small models often fill ageYears
+// (0–60) instead of installYear — 60 then becomes currentYear − 60 (1966 in 2026).
+const CALENDAR_YEAR_PATTERNS = [
+  /(?:ano|year)\s+(?:de\s+)?(19[7-9]\d|20[0-3]\d)\b/,
+  /\b(?:del|en)\s+(19[7-9]\d|20[0-3]\d)\b/,
+];
+
 // A single approximate figure ("unos ocho años") is used directly without widening
 // into an interval, as requested for exact calculations.
 const SINGLE_ESTIMATE_WIDEN_YEARS = 0;
+
+export function extractCalendarYearFromEvidence(evidenceText: string | null, currentYear: number): number | null {
+  const evidence = normalizeText(evidenceText ?? '');
+  if (!evidence) return null;
+  for (const pattern of CALENDAR_YEAR_PATTERNS) {
+    const match = evidence.match(pattern);
+    if (!match) continue;
+    const year = Number(match[1]);
+    if (year >= 1970 && year <= currentYear) return year;
+  }
+  return null;
+}
 
 /**
  * Parse an age/installation-year expression into an install-year interval plus a
@@ -37,11 +57,15 @@ export function parseAge(
   const currentYear = now.getFullYear();
   const evidence = normalizeText(evidenceText ?? '');
   const confirmed = CONFIRMED_PATTERN.test(evidence);
+  const spokenYear = extractCalendarYearFromEvidence(evidenceText, currentYear);
 
-  if (installYear != null) {
+  // An explicit calendar year in the quote beats a structured age-in-years (or a
+  // conflicting installYear the model invented). "del año 2005" must not become 1966.
+  const resolvedYear = spokenYear ?? installYear;
+  if (resolvedYear != null) {
     return {
-      installYearLo: installYear,
-      installYearHi: installYear,
+      installYearLo: resolvedYear,
+      installYearHi: resolvedYear,
       status: confirmed ? 'Confirmado' : 'Reportado',
     };
   }

@@ -28,7 +28,7 @@ const EXAMPLES = [
   example(16, 'Equipos por antigüedad', { groupBy: 'ageBucket' }),
 ].join('\n');
 
-export const QUERY_SYSTEM_PROMPT = `Eres un asistente que traduce una pregunta en lenguaje natural sobre un parque de equipos médicos instalados en clientes hospitalarios a un filtro estructurado. NUNCA escribas SQL ni código: solo llena los campos del JSON que pide el esquema.
+export const QUERY_SYSTEM_PROMPT = `Eres un asistente que traduce una pregunta en lenguaje natural sobre todos los equipos médicos instalados en clientes hospitalarios a un filtro estructurado. NUNCA escribas SQL ni código: solo llena los campos del JSON que pide el esquema.
 
 La pregunta puede estar en español, portugués o inglés.
 

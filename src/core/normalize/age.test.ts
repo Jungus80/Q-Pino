@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ageMidpointYears, parseAge } from './age';
+import { ageMidpointYears, extractCalendarYearFromEvidence, parseAge } from './age';
 
 const NOW = new Date('2026-09-10T00:00:00Z');
 
@@ -51,6 +51,41 @@ describe('parseAge', () => {
     const result = parseAge({ ageYearsMin: null, ageYearsMax: null, installYear: null, evidenceText: null }, NOW);
     expect(result.status).toBe('Desconocido');
     expect(result.installYearLo).toBeNull();
+  });
+
+  it('uses a spoken calendar year even when the model filled ageYears instead of installYear', () => {
+    const result = parseAge(
+      {
+        ageYearsMin: 60,
+        ageYearsMax: 60,
+        installYear: null,
+        evidenceText: 'Es un equipo marca Samsung de modelo FBA 24 del año 2005.',
+      },
+      NOW
+    );
+    expect(result.status).toBe('Reportado');
+    expect(result.installYearLo).toBe(2005);
+    expect(result.installYearHi).toBe(2005);
+  });
+
+  it('prefers the spoken calendar year over a conflicting structured installYear', () => {
+    const result = parseAge(
+      {
+        ageYearsMin: null,
+        ageYearsMax: null,
+        installYear: 1966,
+        evidenceText: 'instalado en 2005',
+      },
+      NOW
+    );
+    expect(result.installYearLo).toBe(2005);
+    expect(result.status).toBe('Reportado');
+  });
+});
+
+describe('extractCalendarYearFromEvidence', () => {
+  it('does not treat a spoken age-in-years as a calendar year', () => {
+    expect(extractCalendarYearFromEvidence('unos ocho años', 2026)).toBeNull();
   });
 });
 

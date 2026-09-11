@@ -3,16 +3,26 @@ import { listAllEquipment, listEquipmentForInstitution } from '@/db/repos/equipm
 import { seedIfEmpty } from '@/db/seed';
 import { resetDb } from '@/db/client';
 import { Icon } from '@/components/Icon';
-import { TabScreenSafeAreaEdges } from '@/constants/theme';
+import { Screen } from '@/components/kit/Screen';
+import { ScreenHeader } from '@/components/kit/ScreenHeader';
+import { FilterChip } from '@/components/kit/FilterChip';
+import { AlertDialog, useAlertDialog } from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Spinner } from '@/components/ui/spinner';
+import { Text } from '@/components/ui/text';
+import { View } from '@/components/ui/view';
+import { useAppStyles } from '@/theme/useAppStyles';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { FlatList, Pressable } from 'react-native';
 
 type InstitutionSummary = InstitutionRow & { equipmentCount: number; modalities: string[] };
 
 export default function ClientsScreen() {
   const router = useRouter();
+  const { muted, styles } = useAppStyles();
+  const dialog = useAlertDialog();
   const [loading, setLoading] = useState(true);
   const [institutions, setInstitutions] = useState<InstitutionSummary[]>([]);
   const [totalsByModality, setTotalsByModality] = useState<Record<string, number>>({});
@@ -48,56 +58,33 @@ export default function ClientsScreen() {
     }, [load])
   );
 
-  function handleReset() {
-    Alert.alert(
-      'Reiniciar datos de prueba',
-      'Borra todos los clientes y equipos guardados y vuelve a cargar los 6 clientes ficticios de siembra (Panamá y Colombia). Esto no se puede deshacer.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Reiniciar',
-          style: 'destructive',
-          onPress: async () => {
-            await resetDb();
-            await load();
-          },
-        },
-      ]
-    );
-  }
-
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 bg-white items-center justify-center" edges={TabScreenSafeAreaEdges}>
-        <ActivityIndicator color="#0066CC" size="large" />
-      </SafeAreaView>
+      <Screen centered>
+        <Spinner size="lg" />
+      </Screen>
     );
   }
 
+  const totalEq = Object.values(totalsByModality).reduce((a, b) => a + b, 0);
+
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={TabScreenSafeAreaEdges}>
-      <View className="px-4 pt-4 pb-4 border-b border-gray-200">
-        <View className="flex-row items-center justify-between mb-3">
-          <View>
-            <Text className="text-gray-900 text-2xl font-bold">Clientes</Text>
-            <Text className="text-gray-500 text-sm mt-1">
-              {institutions.length} clientes · {Object.values(totalsByModality).reduce((a, b) => a + b, 0)} equipos
-            </Text>
-          </View>
-          <Pressable onPress={handleReset} className="bg-red-50 rounded-lg px-3 py-2 flex-row items-center gap-1">
-            <Icon name="close" size="sm" color="#DC2626" />
-            <Text className="text-red-600 text-xs font-semibold">Restablecer</Text>
-          </Pressable>
-        </View>
-        <View className="flex-row flex-wrap gap-2">
+    <Screen>
+      <View style={[styles.pad, { paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: styles.card.borderColor }]}>
+        <ScreenHeader
+          title="Clientes"
+          subtitle={`${institutions.length} clientes · ${totalEq} equipos`}
+          right={
+            <Button variant="ghost" size="sm" onPress={dialog.open} haptic>
+              Restablecer
+            </Button>
+          }
+        />
+        <View style={styles.wrap}>
           {Object.entries(totalsByModality)
             .sort((a, b) => b[1] - a[1])
             .map(([modality, count]) => (
-              <View key={modality} className="bg-blue-100 rounded-full px-3 py-1.5">
-                <Text className="text-blue-700 text-xs font-semibold">
-                  {modality}: <Text className="font-bold">{count}</Text>
-                </Text>
-              </View>
+              <FilterChip key={modality} label={`${modality}: ${count}`} />
             ))}
         </View>
       </View>
@@ -107,31 +94,44 @@ export default function ClientsScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 12 }}
         renderItem={({ item }) => (
-          <Pressable
-            onPress={() => router.push(`/clients/${item.id}`)}
-            className="bg-white border border-gray-200 rounded-xl p-4 mb-3">
-            <View className="flex-row items-start justify-between">
-              <View className="flex-1">
-                <Text className="text-gray-900 font-bold text-base">{item.name}</Text>
-                <Text className="text-gray-600 text-sm mt-1">
-                  {[item.city, item.countryIso].filter(Boolean).join(', ') || 'Ubicación no especificada'}
-                </Text>
-              </View>
-              <Icon name="chevron-right" size="md" color="#D1D5DB" />
-            </View>
-            <View className="flex-row flex-wrap gap-2 mt-3">
-              {item.modalities.map((m) => (
-                <View key={m} className="bg-blue-50 rounded-lg px-2.5 py-1">
-                  <Text className="text-blue-700 text-xs font-semibold">{m}</Text>
+          <Pressable onPress={() => router.push(`/clients/${item.id}`)} style={{ marginBottom: 10 }}>
+            <Card>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                <View style={{ flex: 1, paddingRight: 8 }}>
+                  <Text variant="subtitle">{item.name}</Text>
+                  <Text variant="caption" style={{ marginTop: 4 }}>
+                    {[item.city, item.countryIso].filter(Boolean).join(', ') || 'Ubicación no especificada'}
+                  </Text>
                 </View>
-              ))}
-              {item.modalities.length === 0 && (
-                <Text className="text-gray-500 text-xs">Sin equipos registrados</Text>
-              )}
-            </View>
+                <Icon name="chevron-right" size="md" color={muted} />
+              </View>
+              <View style={[styles.wrap, { marginTop: 12 }]}>
+                {item.modalities.map((m) => (
+                  <FilterChip key={m} label={m} />
+                ))}
+                {item.modalities.length === 0 && (
+                  <Text variant="caption">Sin equipos registrados</Text>
+                )}
+              </View>
+            </Card>
           </Pressable>
         )}
       />
-    </SafeAreaView>
+
+      <AlertDialog
+        isVisible={dialog.isVisible}
+        onClose={dialog.close}
+        title="Reiniciar datos de prueba"
+        description="Borra todos los clientes y equipos guardados y vuelve a cargar los 6 clientes ficticios de siembra (Panamá y Colombia). Esto no se puede deshacer."
+        confirmText="Reiniciar"
+        cancelText="Cancelar"
+        onConfirm={async () => {
+          await resetDb();
+          await load();
+          dialog.close();
+        }}
+        onCancel={dialog.close}
+      />
+    </Screen>
   );
 }

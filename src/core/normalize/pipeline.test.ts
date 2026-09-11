@@ -148,4 +148,32 @@ describe('normalizeObservation — equipment', () => {
     expect(equipment[0].installYearLo).toBe(2018);
     expect(equipment[0].installYearHi).toBe(2018);
   });
+
+  it('recovers install year 2005 from evidence when the model reported age 60 (schema max)', () => {
+    const extraction = baseExtraction({
+      equipment: [
+        {
+          modality: 'MR',
+          count: 1,
+          manufacturer: 'Samsung',
+          model: 'FBA 24',
+          ageYearsMin: 60,
+          ageYearsMax: 60,
+          installYear: null,
+          serial: null,
+          whichUnit: null,
+          fieldStatus: { manufacturer: 'Reportado', model: 'Reportado', age: 'Estimado', count: 'Reportado' },
+          evidence: ['Es un equipo marca Samsung de modelo FBA 24 del año 2005.'],
+        },
+      ],
+    });
+    const { equipment } = normalizeObservation(
+      extraction,
+      'Es un equipo marca Samsung de modelo FBA 24 del año 2005.',
+      NOW
+    );
+    expect(equipment[0].fieldStatus.age).toBe('Reportado');
+    expect(equipment[0].installYearLo).toBe(2005);
+    expect(equipment[0].installYearHi).toBe(2005);
+  });
 });

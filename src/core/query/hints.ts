@@ -651,7 +651,7 @@ export function analyzeQuestion(question: string, options: AnalyzeOptions = {}):
 
   const subjective = SUBJECTIVE_RE.test(q);
   if (subjective) {
-    notes.push('No puedo valorar qué es mejor o peor; te muestro los datos del parque para que compares.');
+    notes.push('No puedo valorar qué es mejor o peor; te muestro los datos de todos los equipos para que compares.');
   }
 
   const hasEntity = matches.length > 0 || institution.length > 0;
