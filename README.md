@@ -297,34 +297,44 @@ El serial leído por OCR es la señal más fuerte para no duplicar: misma placa 
 
 ## OCR de placa
 
-La placa es la evidencia más fuerte. Corre **on-device** con ggml-ocr (`OCR_LATIN` vía QVAC), no con un LLM mirando la foto.
+El OCR **no interpreta** la visita ni el hospital. Solo lee la **etiqueta del equipo** (foto) y saca texto. Un parser determinista convierte esas líneas en campos. Corre on-device (`OCR_LATIN` / ggml-ocr vía QVAC); el LLM no mira la imagen.
+
+### Qué detecta
+
+| Campo | Cómo lo reconoce |
+|-------|------------------|
+| **Serial** | Etiquetas `S/N`, `SN`, `SIN` (mallectura típica de S/N), `SERIE`. Si el OCR parte `MD2012-` y `00487` en dos bloques, se unen. |
+| **Modelo** | `REF` / `MOD`, o el nombre suelto si coincide con el catálogo. |
+| **Fabricante** | Fuzzy contra [`catalog.json`](src/core/normalize/catalog.json). Si el modelo matchea, el fabricante sale del catálogo. |
+| **Año de instalación** | Solo junto a `FAB`, `MFG`, `AÑO`, `YEAR`, `FECHA`. Un 2018 suelto no se toma (puede ser serial). |
+
+No rellena hospital, modalidad, cantidad ni comentarios. Si no sale ninguno de esos cuatro campos, avisa «Sin datos legibles» y no toca nada.
+
+### Cómo llena
+
+Solo **sobrescribe lo que sí leyó**. Lo que no vio en la placa se deja como estaba (por ejemplo un fabricante Reportado no se borra si la foto no trajo marca).
+
+Cada campo leído pasa a **Confirmado** y pisa un valor solo dicho o estimado (la placa gana).
+
+**En Capturar** (revisión, por equipo): [`handleScanForEquipment`](src/app/(tabs)/index.tsx) aplica el parche en memoria al instante. Al guardar, esos Confirmado entran en los `claims` con el resto de la observación.
+
+**En el detalle del equipo:** muestra lo leído y hay que **aplicar**. [`handleApplyScan`](src/app/equipment/[id].tsx) llama `saveEquipmentEdit` con `source: 'photo'` y evidencia `Leído de placa (OCR): "…"`. Escribe observación + claims Confirmado y actualiza la fila del equipo.
+
+El serial confirmado es la señal más fuerte para no duplicar: misma placa → misma máquina.
 
 ```mermaid
-flowchart LR
-  cam[Cámara expo-image-picker] --> path[Path sin file://]
-  path --> ocr["ocr QVAC canvas 1280"]
-  ocr --> lines[Bloques de texto]
-  lines --> parse[parsePlateText]
-  parse --> fields[serial fabricante modelo año]
-  fields --> conf[Campos Confirmado]
+flowchart TD
+  photo[Foto de la placa] --> ocr[ggml-ocr texto]
+  ocr --> parse[parsePlateText]
+  parse --> empty{Serial marca modelo o año?}
+  empty -->|No| alert[Sin datos legibles]
+  empty -->|Sí| fill[Rellenar solo esos campos]
+  fill --> status[Marcar Confirmado]
+  status --> capture[Capturar: parche en memoria luego saveObservation]
+  status --> detail[Detalle: aplicar saveEquipmentEdit]
 ```
 
-[`scanPlate`](src/ai/plateOcr.ts):
-
-- Quita el prefijo `file://` (QVAC lee el filesystem, no URIs).
-- Carga OCR en exclusivo (`withModel`) y baja el canvas a **1280 px** para que fotos de ~4000 px no revienten la alocación ggml.
-- Devuelve líneas crudas más el parse estructurado.
-
-[`parsePlateText`](src/core/normalize/plate.ts) no usa el modelo de lenguaje. Regex + catálogo ficticio:
-
-- **Serial:** etiquetas `S/N`, `SN`, `SIN` (mallectura típica de S/N), `SERIE`. Si el OCR parte `MD2012-` y `00487` en dos bloques, se vuelven a unir.
-- **Modelo:** `REF` / `MOD`, o el nombre suelto si matchea el catálogo.
-- **Año:** solo junto a `FAB`, `MFG`, `AÑO`, `YEAR`, `FECHA` — un 2018 suelto no se toma (puede ser fragmento de serial).
-- **Fabricante:** fuzzy contra [`catalog.json`](src/core/normalize/catalog.json).
-
-Todo lo que sale de la placa se trata como **Confirmado**. En Capturar parchea el estado en memoria antes de guardar; en el detalle del equipo se persiste con `saveEquipmentEdit`.
-
-Se usa desde Capturar ([`src/app/(tabs)/index.tsx`](src/app/(tabs)/index.tsx)) y desde el equipo ([`src/app/equipment/[id].tsx`](src/app/equipment/[id].tsx)).
+Detalle técnico de [`scanPlate`](src/ai/plateOcr.ts): quita `file://`, canvas **1280 px** (fotos de ~4000 px reventaban ggml), un modelo en RAM. El parse está en [`parsePlateText`](src/core/normalize/plate.ts).
 
 ## Antigüedad y renovación
 
